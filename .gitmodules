@@ -1,0 +1,3 @@
+[submodule "variational-causal-inference"]
+	path = variational-causal-inference
+	url = https://github.com/yulun-rayn/variational-causal-inference

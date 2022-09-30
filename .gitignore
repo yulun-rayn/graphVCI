@@ -1,3 +1,25 @@
+# MY ADDITIONS
+.idea
+.vscode
+.DS_Store
+*.h5ad
+*.pqt
+*.parquet
+*.swp
+*.pem
+run*
+test_run*
+*.nfs*
+log/
+runs/
+saves/
+artifact/
+graphs/**/*.pt
+graphs/**/*.pth
+graphs/**/*.pkl
+graphs/**/*.txt
+graphs/**/*.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

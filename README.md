@@ -1,37 +1,27 @@
-# Graph Variational Causal Inference
+# Data Preparation
 
 
-## Installation
+## Procedure
 
-### 1. Create Conda Environment
-```bash
-conda config --append channels conda-forge
-conda create -n gvci-env --file requirements.txt
-conda activate gvci-env
-```
+A clean example of data preparation can be found in [SciplexPrep.ipynb](datasets/SciplexPrep.ipynb). For an example of data preparation on a messier dataset with thorough analysis and visualizations, see [MarsonPrep.ipynb](datasets/MarsonPrep.ipynb).
 
-### 2. Install Learning Libraries
-- [Pytorch](https://pytorch.org/) [**1.11**.0](https://pytorch.org/get-started/previous-versions/)
-- [Pytorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/) [**2.0**.4](https://pytorch-geometric.readthedocs.io/en/2.0.4/notes/installation.html)
+In summary, the preparation procedure includes:
 
-  \* *make sure to install the right versions for your toolkit*
+-   Quality Control
 
-### 3. Install Submodule
-```bash
-git submodule update --init --recursive
-pip install -e variational-causal-inference
-```
+-   Normalization
 
+-   Gene Selection
 
-## Run
-Once the environment is set up, the function call to train & evaluate graphVCI is:
+-   Field Specification
 
-```bash
-./main_train.sh &
-```
+-   (Optional) Dataset Split
 
-A list of flags may be found in `main_train.sh` and `src/main_train.py` for experimentation with different network parameters. The run log and models are saved under `*artifact_path*/saves`, and the tensorboard log is saved under `*artifact_path*/runs`.
+-   (Optional) Out-of-distribution Selection
+
+-   (Optional) Differentially-expressed Gene Ranking
 
 ## License
 
 Contributions are welcome! All content here is licensed under the MIT license.
+

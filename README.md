@@ -28,14 +28,19 @@ pip install -e variational-causal-inference
 
 
 ## Run
-Once the environment is set up, the function call to train & evaluate graphVCI is:
+
+Visit our [resource site](https://osf.io/5n2mz/), download the contents of `main/datasets` into [datasets](datasets) and the contents of `main/graphs` into [graphs](graphs). To process your own dataset, see `data-prep` branch; to generate your own graph, see `graph-prep` branch.
+
+
+Once the environment is set up and the contents are prepared, the function call to train & evaluate graphVCI is:
 
 ```bash
 ./main_train.sh &
 ```
 
-A list of flags may be found in `main_train.sh` and `src/main_train.py` for experimentation with different network parameters. The run log and models are saved under `*artifact_path*/saves`, and the tensorboard log is saved under `*artifact_path*/runs`.
+A list of flags may be found in `main_train.sh` and `main_train.py` for experimentation with different network parameters. The run log and models are saved under `*artifact_path*/saves`, and the tensorboard log is saved under `*artifact_path*/runs`.
 
 ## License
 
 Contributions are welcome! All content here is licensed under the MIT license.
+

@@ -1,5 +1,7 @@
 # Data Preparation
 
+Visit our [resource site](https://osf.io/5n2mz/) and download the contents of `data-prep/datasets` into [datasets](datasets).
+
 
 ## Procedure
 

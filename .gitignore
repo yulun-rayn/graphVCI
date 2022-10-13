@@ -16,6 +16,7 @@ saves/
 artifact/
 graphs/**/*.pt
 graphs/**/*.pth
+graphs/**/*.pkl
 graphs/**/*.txt
 graphs/**/*.csv
 

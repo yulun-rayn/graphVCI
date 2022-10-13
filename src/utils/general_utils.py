@@ -1,4 +1,12 @@
 import sys
+import json
+
+def pjson(s):
+    """
+    Prints a string in JSON format and flushes stdout
+    """
+    print(json.dumps(s), flush=True)
+
 
 class Suppressor(object):
 

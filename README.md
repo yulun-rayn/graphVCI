@@ -1,36 +1,23 @@
-# Graph Variational Causal Inference
+# Graph Distillation
 
 
-## Installation
+## Procedure
 
-### 1. Create Conda Environment
+### 1. Create Initial GRN
+Open [GenerateGRN.ipynb](graphs/GenerateGRN.ipynb), set dataset name in the second chunk, then run all.
+
+### 2. Run Updating Model
 ```bash
-conda config --append channels conda-forge
-conda create -n gvci-env --file requirements.txt
-conda activate gvci-env
+./main.sh &
 ```
 
-### 2. Install Learning Libraries
-- [Pytorch](https://pytorch.org/) [**1.11**.0](https://pytorch.org/get-started/previous-versions/)
-- [Pytorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/) [**2.0**.4](https://pytorch-geometric.readthedocs.io/en/2.0.4/notes/installation.html)
+A list of flags may be found in `main.sh` and `src/main.py` for experimentation with different network parameters. The run log and models are saved under `*artifact_path*/saves`, and the tensorboard log is saved under `*artifact_path*/runs`.
 
-  \* *make sure to install the right versions for your toolkit*
+### 3. Generate Updated Adjacency Matrix
+Open [UpdateGRN.ipynb](graphs/UpdateGRN.ipynb), set path of the saved model in the first chunk, then run all.
 
-### 3. Install Submodule
-```bash
-git submodule update --init --recursive
-pip install -e variational-causal-inference
-```
-
-
-## Run
-Once the environment is set up, the function call to train & evaluate graphVCI is:
-
-```bash
-./main_train.sh &
-```
-
-A list of flags may be found in `main_train.sh` and `src/main_train.py` for experimentation with different network parameters. The run log and models are saved under `*artifact_path*/saves`, and the tensorboard log is saved under `*artifact_path*/runs`.
+### 4. Generate Updated GRN
+Open [GenerateGRN.ipynb](graphs/GenerateGRN.ipynb). Uncomment the third chunk, then run all.
 
 ## License
 

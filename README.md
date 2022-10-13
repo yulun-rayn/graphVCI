@@ -15,7 +15,7 @@ Open [GenerateGRN.ipynb](graphs/GenerateGRN.ipynb), set dataset name in the seco
 ./main.sh &
 ```
 
-A list of flags may be found in `main.sh` and `src/main.py` for experimentation with different network parameters. The run log and models are saved under `*artifact_path*/saves`, and the tensorboard log is saved under `*artifact_path*/runs`.
+A list of flags may be found in `main.sh` and `src/main.py` for experimentation with different hyperparameters. The models are saved under `*artifact_path*/saves`.
 
 ### 3. Generate Updated Adjacency Matrix
 Open [UpdateGRN.ipynb](graphs/UpdateGRN.ipynb), set path of the saved model in the first chunk, then run all.

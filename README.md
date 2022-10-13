@@ -1,6 +1,6 @@
 # Graph Preparation
 
-Visit our [resource site](https://osf.io/5n2mz/) and download the contents of *graph-prep/graphs* into [graphs](graphs).
+Visit our [resource site](https://osf.io/5n2mz/) and download the contents of `graph-prep/graphs` into [graphs](graphs).
 
 
 ## Procedure

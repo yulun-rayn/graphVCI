@@ -1,5 +1,9 @@
 # Graph Variational Causal Inference
 
+This repository is the official implementation of [**Predicting Cellular Responses with Variational Causal Inference and Refined Relational Information**](https://arxiv.org/abs/2210.00116).
+
+![](figure/workflow.png)
+
 
 ## Installation
 

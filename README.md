@@ -38,7 +38,7 @@ Once the environment is set up and the contents are prepared, the function call 
 ./main_train.sh &
 ```
 
-A list of flags may be found in `main_train.sh` and `main_train.py` for experimentation with different network parameters. The run log and models are saved under `*artifact_path*/saves`, and the tensorboard log is saved under `*artifact_path*/runs`.
+A list of flags may be found in `main_train.sh` and `main_train.py` for experimentation with different hyperparameters. The run log and models are saved under `*artifact_path*/saves`, and the tensorboard log is saved under `*artifact_path*/runs`.
 
 ## License
 

@@ -4,6 +4,8 @@ This repository is the official implementation of [**Predicting Cellular Respons
 
 ![](figure/workflow.png)
 
+Implementation for the non-graph version of our framework -- [**Variational Causal Inference**](https://arxiv.org/abs/2209.05935), can be found [here](https://github.com/yulun-rayn/variational-causal-inference).
+
 
 ## Installation
 

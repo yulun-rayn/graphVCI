@@ -18,7 +18,7 @@ conda activate gvci-env
 
 ### 2. Install Learning Libraries
 - [Pytorch](https://pytorch.org/) [**1.11**.0](https://pytorch.org/get-started/previous-versions/)
-- [Pytorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/) [**2.0**.4](https://pytorch-geometric.readthedocs.io/en/2.0.4/notes/installation.html)
+- [Pytorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/) [**2.1**.0](https://pytorch-geometric.readthedocs.io/en/2.0.4/notes/installation.html)
 
   \* *make sure to install the right versions for your toolkit*
 
@@ -40,7 +40,7 @@ Once the environment is set up and the contents are prepared, the function call 
 ./main_train.sh &
 ```
 
-A list of flags may be found in `main_train.sh` and `main_train.py` for experimentation with different hyperparameters. The models are saved under `*artifact_path*/saves`, and the tensorboard log is saved under `*artifact_path*/runs`.
+A list of flags may be found in `main_train.sh` and `main_train.py` for experimentation with different hyperparameters. The run log and models are saved under `*artifact_path*/saves`, and the tensorboard log is saved under `*artifact_path*/runs`.
 
 ## License
 

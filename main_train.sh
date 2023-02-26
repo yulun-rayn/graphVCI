@@ -18,7 +18,6 @@ PYARGS="$PYARGS --dist_mode match"
 
 PYARGS="$PYARGS --max_epochs 1000"
 PYARGS="$PYARGS --batch_size 64"
-PYARGS="$PYARGS --checkpoint_freq 10"
 PYARGS="$PYARGS --eval_mode classic"
 
 python main_train.py $PYARGS

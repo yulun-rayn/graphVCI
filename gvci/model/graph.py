@@ -70,7 +70,7 @@ class MyGAT(torch.nn.Module):
 
         x = x.unsqueeze(0) if x.dim() == 2 else x
         data_list = [Data(d, edge_index, edge_weight) for d in x]
-        batch = Batch().from_data_list(data_list)
+        batch = Batch.from_data_list(data_list)
         x, edge_index, edge_weight = (
             batch.x, batch.edge_index, batch.edge_attr
         )

@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import logging
 from datetime import datetime
 from collections import defaultdict
 
@@ -13,7 +14,7 @@ from gvci.dataset import Dataset, LabelData
 from gvci.evaluate import evaluate_auc
 from gvci.model.graph import MyLinkPred
 
-from vci.utils.general_utils import pjson
+from vci.utils.general_utils import initialize_logger, ljson
 
 hparams = {
     "latent_dim": 128,
@@ -59,98 +60,6 @@ def prepare(args, hparams, state_dict=None):
 
     return model, datasets
 
-def link_pred(args, return_model=False):
-    """
-    Trains a link prediction model
-    """
-    if args["seed"] is not None:
-        torch.manual_seed(args["seed"])
-    
-    if args["hparams"] != "":
-        if isinstance(args["hparams"], str):
-            with open(args["hparams"]) as f:
-                dictionary = json.load(f)
-            hparams.update(dictionary)
-        else:
-            hparams.update(args["hparams"])
-
-    pjson({"training_args": args})
-    pjson({"model_params": hparams})
-
-    dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
-    save_dir = os.path.join(args["artifact_path"], "saves/" + args["name"] + "_" + dt)
-    os.makedirs(save_dir, exist_ok=True)
-
-    # prepare
-    model, datasets = prepare(args, hparams)
-
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=hparams["lr"])
-    criterion = torch.nn.BCEWithLogitsLoss()
-
-    train_data, val_data, test_data = datasets[0]
-
-    # train
-    start_time = time.time()
-    best_val_auc = final_test_auc = 0
-    for epoch in range(args["max_epochs"]):
-        loss = train_iter(
-            train_data, model, optimizer, criterion,
-            batch_size=args["batch_size"]
-        )
-        val_auc = evaluate_auc(val_data, model)
-        test_auc = evaluate_auc(test_data, model)
-        if val_auc > best_val_auc:
-            best_val_auc = val_auc
-            final_test_auc = test_auc
-
-            torch.save(
-                (model.state_dict(), args),
-                os.path.join(
-                    save_dir,
-                    "best_val_model_seed={}.pt".format(args["seed"], epoch),
-                ),
-            )
-
-        ellapsed_minutes = (time.time() - start_time) / 60
-
-        # decay learning rate if necessary
-        # also check stopping condition: patience ran out OR
-        # time ran out OR max epochs reached
-        stop = (
-            (epoch == args["max_epochs"] - 1) 
-            #or (ellapsed_minutes > args["max_minutes"])
-        )
-
-        if (epoch % args["checkpoint_freq"]) == 0 or stop:
-            pjson(
-                {
-                    "epoch": epoch,
-                    "loss": loss,
-                    "val_auc": val_auc,
-                    "test_auc": test_auc,
-                    "ellapsed_minutes": ellapsed_minutes,
-                }
-            )
-
-            torch.save(
-                (model.state_dict(), args),
-                os.path.join(
-                    save_dir,
-                    "model_seed={}_epoch={}.pt".format(args["seed"], epoch),
-                ),
-            )
-
-    pjson(f'Final Test: {final_test_auc:.4f}')
-
-    z = model.encode(test_data.x, test_data.edge_index)
-    final_edge_index = model.decode_all(z)
-
-    if return_model:
-        return final_edge_index, model
-    else:
-        return final_edge_index
-
-    
 def train_iter(data, model, optimizer, criterion, batch_size=128):
     model.train()
 
@@ -191,3 +100,96 @@ def train_iter(data, model, optimizer, criterion, batch_size=128):
         losses += loss.item()
 
     return losses / len(data_loader)
+
+def link_pred(args, return_model=False):
+    """
+    Trains a link prediction model
+    """
+    if args["seed"] is not None:
+        torch.manual_seed(args["seed"])
+
+    if args["hparams"] != "":
+        if isinstance(args["hparams"], str):
+            with open(args["hparams"]) as f:
+                dictionary = json.load(f)
+            hparams.update(dictionary)
+        else:
+            hparams.update(args["hparams"])
+
+    dt = datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
+    save_dir = os.path.join(args["artifact_path"], "saves/" + args["name"] + "_" + dt)
+    os.makedirs(save_dir, exist_ok=True)
+
+    initialize_logger(save_dir)
+    ljson({"training_args": args})
+    ljson({"model_params": hparams})
+    logging.info("")
+
+    # prepare
+    model, datasets = prepare(args, hparams)
+
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=hparams["lr"])
+    criterion = torch.nn.BCEWithLogitsLoss()
+
+    train_data, val_data, test_data = datasets[0]
+
+    # train
+    start_time = time.time()
+    best_val_auc = final_test_auc = 0
+    for epoch in range(args["max_epochs"]):
+        loss = train_iter(
+            train_data, model, optimizer, criterion,
+            batch_size=args["batch_size"]
+        )
+        val_auc = evaluate_auc(val_data, model)
+        test_auc = evaluate_auc(test_data, model)
+        if val_auc > best_val_auc:
+            best_val_auc = val_auc
+            final_test_auc = test_auc
+
+            torch.save(
+                (model.state_dict(), args),
+                os.path.join(
+                    save_dir,
+                    "best_val_model_seed={}.pt".format(args["seed"], epoch),
+                ),
+            )
+
+        ellapsed_minutes = (time.time() - start_time) / 60
+
+        # decay learning rate if necessary
+        # also check stopping condition: patience ran out OR
+        # time ran out OR max epochs reached
+        stop = (
+            (epoch == args["max_epochs"] - 1) 
+            or (ellapsed_minutes > args["max_minutes"])
+        )
+
+        if (epoch % args["checkpoint_freq"]) == 0 or stop:
+            ljson(
+                {
+                    "epoch": epoch,
+                    "loss": loss,
+                    "val_auc": val_auc,
+                    "test_auc": test_auc,
+                    "ellapsed_minutes": ellapsed_minutes,
+                }
+            )
+
+            torch.save(
+                (model.state_dict(), args),
+                os.path.join(
+                    save_dir,
+                    "model_seed={}_epoch={}.pt".format(args["seed"], epoch),
+                ),
+            )
+
+    ljson(f'Final Test: {final_test_auc:.4f}')
+
+    z = model.encode(test_data.x, test_data.edge_index)
+    final_edge_index = model.decode_all(z)
+
+    if return_model:
+        return final_edge_index, model
+    else:
+        return final_edge_index

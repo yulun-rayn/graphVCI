@@ -1,3 +1,5 @@
+import copy
+
 import torch
 import torch.nn.functional as F
 from torch.distributions import Normal, RelaxedBernoulli
@@ -225,6 +227,8 @@ class GVCI(VCI):
         )
         params.extend(list(self.encoder.parameters()))
 
+        self.encoder_eval = copy.deepcopy(self.encoder)
+
         # decoder
         self.decoder = GVCIDecoder(
             mlp_sizes=[self.hparams["latent_dim"]+treatment_dim]
@@ -391,7 +395,7 @@ class GVCI(VCI):
         else:
             raise ValueError("dist_mode not recognized")
 
-    def encode(self, outcomes, treatments, covariates):
+    def encode(self, outcomes, treatments, covariates, eval=False):
         if self.embed_outcomes:
             outcomes = self.outcomes_embeddings(outcomes)
         if self.embed_treatments:
@@ -404,9 +408,14 @@ class GVCI(VCI):
         inputs = torch.cat([outcomes, treatments] + covariates, -1)
         features = self.features_embeddings
 
-        return self.encoder(
-            inputs, features, self.edge_index, self.edge_weight_logits, return_graph=True
-        )
+        if eval:
+            return self.encoder_eval(
+                inputs, features, self.edge_index, self.edge_weight_logits, return_graph=True
+            )
+        else:
+            return self.encoder(
+                inputs, features, self.edge_index, self.edge_weight_logits, return_graph=True
+            )
 
     def decode(self, latents, graph_latents, treatments):
         if self.embed_treatments:
@@ -533,7 +542,7 @@ class GVCI(VCI):
             return outcomes_dist_samp.mean
 
     def update(self, outcomes, treatments, cf_outcomes, cf_treatments, covariates,
-                rsample=True, detach_pattern=None):
+                rsample=True, detach_encode=False, detach_eval=True):
         """
         Update GVCI's parameters given a minibatch of outcomes, treatments, and
         cell types.
@@ -566,11 +575,7 @@ class GVCI(VCI):
             cf_outcomes_out = self.distributionize(cf_outcomes_constr).mean
 
         # q(z | y', g, x, t')
-        if detach_pattern is None:
-            cf_outcomes_in = cf_outcomes_out
-        elif detach_pattern == "full":
-            cf_outcomes_in = cf_outcomes_out.detach()
-        elif detach_pattern == "half":
+        if detach_encode:
             if rsample:
                 cf_outcomes_in = self.distributionize(
                     self.decode(latents_dist.sample(), cf_treatments)
@@ -580,9 +585,11 @@ class GVCI(VCI):
                     self.decode(latents_dist.mean.detach(), cf_treatments)
                 ).mean
         else:
-            raise ValueError("Unrecognized: detaching pattern of the counterfactual outcome "
-                "in the KL Divergence term.")
-        cf_latents_constr, _ = self.encode(cf_outcomes_in, cf_treatments, covariates)
+            cf_outcomes_in = cf_outcomes_out
+
+        cf_latents_constr, _ = self.encode(
+            cf_outcomes_in, cf_treatments, covariates, eval=detach_eval
+        )
         cf_latents_dist = self.distributionize(cf_latents_constr, dist="normal")
 
         indiv_spec_nllh, covar_spec_nllh, kl_divergence = self.loss(

@@ -4,7 +4,7 @@ This repository is the official implementation of [**Predicting Cellular Respons
 
 ![](figure/workflow.png)
 
-Implementation for the non-graph version of our framework -- [**Variational Causal Inference**](https://arxiv.org/abs/2209.05935), can be found [here](https://github.com/yulun-rayn/variational-causal-inference).
+The L008 CROP-seq dataset released with our paper can be found [here](https://osf.io/a87cu/).
 
 
 ## Installation
@@ -31,7 +31,7 @@ pip install -e variational-causal-inference
 
 ## Run
 
-Visit our [resource site](https://osf.io/5n2mz/), download the contents of `main/datasets` into [datasets](datasets) and the contents of `main/graphs` into [graphs](graphs). To process your own dataset, see `data-prep` branch; to generate your own graph, see `graph-prep` branch.
+Visit our [resource site](https://osf.io/5n2mz/), download the contents of `main/datasets` into [datasets](datasets) and the contents of `main/graphs` into [graphs](graphs). To process your own dataset, see `data-prep` branch; to generate your own graph, see `graph-prep` branch. If using gene relational graphs is not desired, see the [repository](https://github.com/yulun-rayn/variational-causal-inference) for [**Variational Causal Inference**](https://arxiv.org/abs/2209.05935).
 
 
 Once the environment is set up and the contents are prepared, the function call to train & evaluate graphVCI is:

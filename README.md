@@ -20,7 +20,7 @@ Open [GenerateGRN.ipynb](graphs/GenerateGRN.ipynb), set dataset name in the seco
 A list of flags may be found in `main.sh` and `src/main.py` for experimentation with different hyperparameters. The models are saved under `*artifact_path*/saves`.
 
 ### 3. Generate Updated Adjacency Matrix
-Open [UpdateGRN.ipynb](graphs/UpdateGRN.ipynb), set path of the saved model in the first chunk, then run all.
+Open [UpdateGRN.ipynb](graphs/UpdateGRN.ipynb), set dataset name and path of the saved model in the first chunk, then run all.
 
 ### 4. Generate Updated GRN
 Open [GenerateGRN.ipynb](graphs/GenerateGRN.ipynb). Uncomment the third chunk, then run all.

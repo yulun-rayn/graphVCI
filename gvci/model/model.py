@@ -1,6 +1,7 @@
 import copy
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal, RelaxedBernoulli
 
@@ -134,7 +135,7 @@ class GVCI(VCI):
 
     def _init_graph(self, graph):
 
-        self.features_embeddings = torch.nn.Parameter(
+        self.features_embeddings = nn.Parameter(
             graph.x, requires_grad=self.feature_grad
         )
         if self.feature_grad:
@@ -157,10 +158,10 @@ class GVCI(VCI):
         else:
             ValueError("graph_mode not recognized")
 
-        self.edge_index = torch.nn.Parameter(
+        self.edge_index = nn.Parameter(
             edge_index, requires_grad=False
         )
-        self.edge_weight_logits = torch.nn.Parameter(
+        self.edge_weight_logits = nn.Parameter(
             edge_weight_logits, requires_grad=self.edge_grad
         )
 
@@ -186,7 +187,7 @@ class GVCI(VCI):
             outcome_dim = self.num_outcomes
 
         if self.embed_treatments:
-            self.treatments_embeddings = torch.nn.Embedding(
+            self.treatments_embeddings = nn.Embedding(
                 self.num_treatments, self.hparams["treatment_emb_dim"]
             )
             treatment_dim = self.hparams["treatment_emb_dim"]
@@ -198,11 +199,11 @@ class GVCI(VCI):
             self.covariates_embeddings = []
             for num_covariate in self.num_covariates:
                 self.covariates_embeddings.append(
-                    torch.nn.Embedding(num_covariate, 
+                    nn.Embedding(num_covariate, 
                         self.hparams["covariate_emb_dim"]
                     )
                 )
-            self.covariates_embeddings = torch.nn.Sequential(
+            self.covariates_embeddings = nn.Sequential(
                 *self.covariates_embeddings
             )
             covariate_dim = self.hparams["covariate_emb_dim"]*len(self.num_covariates)
@@ -266,7 +267,7 @@ class GVCI(VCI):
                 outcome_dim = self.num_outcomes
 
             if self.embed_treatments:
-                self.adv_treatments_emb = torch.nn.Embedding(
+                self.adv_treatments_emb = nn.Embedding(
                     self.num_treatments, self.hparams["treatment_emb_dim"]
                 )
                 treatment_dim = self.hparams["treatment_emb_dim"]
@@ -278,11 +279,11 @@ class GVCI(VCI):
                 self.adv_covariates_emb = []
                 for num_covariate in self.num_covariates:
                     self.adv_covariates_emb.append(
-                        torch.nn.Embedding(num_covariate, 
+                        nn.Embedding(num_covariate, 
                             self.hparams["covariate_emb_dim"]
                         )
                     )
-                self.adv_covariates_emb = torch.nn.Sequential(
+                self.adv_covariates_emb = nn.Sequential(
                     *self.adv_covariates_emb
                 )
                 covariate_dim = self.hparams["covariate_emb_dim"]*len(self.num_covariates)
@@ -295,7 +296,7 @@ class GVCI(VCI):
             if self.encode_aggr == "sum":
                 assert self.hparams["discriminator_width"] == self.g_hparams["graph_discriminator_width"]
 
-            self.discriminator = torch.nn.Sequential(
+            self.discriminator = nn.Sequential(
                 GVCIEncoder(
                     mlp_sizes=[outcome_dim+treatment_dim+covariate_dim]
                         + [self.hparams["discriminator_width"]] 
@@ -311,7 +312,7 @@ class GVCI(VCI):
                 ),
                 MLP(self.hparams["discriminator_width"], 1)
             )
-            self.loss_discriminator = torch.nn.BCEWithLogitsLoss()
+            self.loss_discriminator = nn.BCEWithLogitsLoss()
             params.extend(list(self.discriminator.parameters()))
 
             self.optimizer_discriminator = torch.optim.Adam(
@@ -330,7 +331,7 @@ class GVCI(VCI):
 
             # embeddings
             if self.embed_treatments:
-                self.adv_treatments_emb = torch.nn.Embedding(
+                self.adv_treatments_emb = nn.Embedding(
                     self.num_treatments, self.hparams["treatment_emb_dim"]
                 )
                 treatment_dim = self.hparams["treatment_emb_dim"]
@@ -342,11 +343,11 @@ class GVCI(VCI):
                 self.adv_covariates_emb = []
                 for num_covariate in self.num_covariates:
                     self.adv_covariates_emb.append(
-                        torch.nn.Embedding(num_covariate, 
+                        nn.Embedding(num_covariate, 
                             self.hparams["covariate_emb_dim"]
                         )
                     )
-                self.adv_covariates_emb = torch.nn.Sequential(
+                self.adv_covariates_emb = nn.Sequential(
                     *self.adv_covariates_emb
                 )
                 covariate_dim = self.hparams["covariate_emb_dim"]*len(self.num_covariates)
@@ -359,7 +360,7 @@ class GVCI(VCI):
             if self.encode_aggr == "sum":
                 assert self.hparams["estimator_width"] == self.g_hparams["graph_estimator_width"]
 
-            self.outcome_estimator = torch.nn.Sequential(
+            self.outcome_estimator = nn.Sequential(
                 GVCIEncoder(
                     mlp_sizes=[treatment_dim+covariate_dim]
                         + [self.hparams["estimator_width"]] 
@@ -375,7 +376,7 @@ class GVCI(VCI):
                 ),
                 MLP(self.hparams["estimator_width"], self.num_outcomes)
             )
-            self.loss_outcome_estimator = torch.nn.MSELoss()
+            self.loss_outcome_estimator = nn.MSELoss()
             params.extend(list(self.outcome_estimator.parameters()))
 
             self.optimizer_estimator = torch.optim.Adam(

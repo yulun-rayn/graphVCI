@@ -6,13 +6,14 @@ from datetime import datetime
 from collections import defaultdict
 
 import torch
+import torch.nn as nn
 
 import torch_geometric.transforms as T
 from torch_geometric.utils import negative_sampling
 
 from gvci.dataset import Dataset, LabelData
 from gvci.evaluate import evaluate_auc
-from gvci.model.graph import MyLinkPred
+from gvci.model.graph import MyDenseGCN, MyGCN, MyGAT
 
 from vci.utils.general_utils import initialize_logger, ljson
 
@@ -22,6 +23,31 @@ hparams = {
     "encoder_depth": 2,
     "lr": 3e-4
 }
+
+
+class MyLinkPred(nn.Module):
+    def __init__(self, sizes, mode="sparse", final_act=None):
+        super().__init__()
+        if mode == "dense":
+            self.network = MyDenseGCN(sizes,
+                add_self_loops=True, final_act=final_act
+            )
+        elif mode == "sparse":
+            self.network = MyGCN(sizes,
+                add_self_loops=True, final_act=final_act
+            )
+        else:
+            raise ValueError("mode not recognized")
+
+    def encode(self, x, edge_index):
+        return self.network(x, edge_index).squeeze(0)
+
+    def decode(self, z, edge_label_index):
+        return (z[edge_label_index[0]] * z[edge_label_index[1]]).sum(dim=-1)
+
+    def decode_all(self, z):
+        prob_adj = z @ z.t()
+        return (prob_adj > 0).nonzero(as_tuple=False).t()
 
 def prepare(args, hparams, state_dict=None):
     """

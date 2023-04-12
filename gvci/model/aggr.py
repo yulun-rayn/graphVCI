@@ -1,10 +1,10 @@
 import torch
-from torch_geometric.utils import softmax
+import torch.nn as nn
 
 from vci.model.module import MLP
 
 
-class GraphAggrSUM(torch.nn.Module):
+class GraphAggrSUM(nn.Module):
     def __init__(self, heads=1,
                  input_size=None, output_size=None,
                  final_act=None):
@@ -18,11 +18,11 @@ class GraphAggrSUM(torch.nn.Module):
         if final_act is None:
             self.final_act = None
         elif final_act == 'relu':
-            self.final_act = torch.nn.ReLU()
+            self.final_act = nn.ReLU()
         elif final_act == 'sigmoid':
-            self.final_act = torch.nn.Sigmoid()
+            self.final_act = nn.Sigmoid()
         elif final_act == 'softmax':
-            self.final_act = torch.nn.Softmax(dim=-1)
+            self.final_act = nn.Softmax(dim=-1)
         else:
             raise ValueError("final_act not recognized")
 
@@ -36,7 +36,7 @@ class GraphAggrSUM(torch.nn.Module):
         return self.final_act(out) if self.final_act is not None else out
 
 
-class GraphAggrMLP(torch.nn.Module):
+class GraphAggrMLP(nn.Module):
     def __init__(self, heads=1,
                  input_size=None, output_size=None,
                  final_act=None):
@@ -54,7 +54,7 @@ class GraphAggrMLP(torch.nn.Module):
         return out.view(z.size(0), -1, self.heads)
 
 
-class GraphAggrMLPv2(torch.nn.Module):
+class GraphAggrMLPv2(nn.Module):
     def __init__(self, heads=1,
                  input_size=None, output_size=None,
                  final_act=None):
@@ -74,7 +74,7 @@ class GraphAggrMLPv2(torch.nn.Module):
         return self.mlp(torch.cat([z, x], -1))
 
 
-class NodeAggrDOT(torch.nn.Module):
+class NodeAggrDOT(nn.Module):
     def __init__(self, heads=1,
                  input_size=None, output_size=None,
                  final_act=None):
@@ -88,11 +88,11 @@ class NodeAggrDOT(torch.nn.Module):
         if final_act is None:
             self.final_act = None
         elif final_act == 'relu':
-            self.final_act = torch.nn.ReLU()
+            self.final_act = nn.ReLU()
         elif final_act == 'sigmoid':
-            self.final_act = torch.nn.Sigmoid()
+            self.final_act = nn.Sigmoid()
         elif final_act == 'softmax':
-            self.final_act = torch.nn.Softmax(dim=-1)
+            self.final_act = nn.Softmax(dim=-1)
         else:
             raise ValueError("final_act not recognized")
 
@@ -104,7 +104,7 @@ class NodeAggrDOT(torch.nn.Module):
         return self.final_act(out) if self.final_act is not None else out
 
 
-class NodeAggrMLP(torch.nn.Module):
+class NodeAggrMLP(nn.Module):
     def __init__(self, heads=1,
                  input_size=None, output_size=None,
                  final_act=None):
@@ -123,7 +123,7 @@ class NodeAggrMLP(torch.nn.Module):
         return self.mlp(torch.cat([z, x], -1))
 
 
-class NodeAggrATT(torch.nn.Module):
+class NodeAggrATT(nn.Module):
     def __init__(self, heads=1,
                  input_size=None, output_size=None,
                  final_act=None):
@@ -133,16 +133,16 @@ class NodeAggrATT(torch.nn.Module):
         self.att = MLP(
             [input_size, heads*output_size], final_act=None
         )
-        self.softmax = torch.nn.Softmax(dim=2)
+        self.softmax = nn.Softmax(dim=2)
 
         if final_act is None:
             self.final_act = None
         elif final_act == 'relu':
-            self.final_act = torch.nn.ReLU()
+            self.final_act = nn.ReLU()
         elif final_act == 'sigmoid':
-            self.final_act = torch.nn.Sigmoid()
+            self.final_act = nn.Sigmoid()
         elif final_act == 'softmax':
-            self.final_act = torch.nn.Softmax(dim=-1)
+            self.final_act = nn.Softmax(dim=-1)
         else:
             raise ValueError("final_act not recognized")
 
@@ -154,7 +154,7 @@ class NodeAggrATT(torch.nn.Module):
 
         alpha = self.att(torch.cat([z, x], -1))
         alpha = alpha.view(z.size(0), z.size(1), -1, self.heads)
-        alpha = self.softmax(alpha)
+        #alpha = self.softmax(alpha)
 
         out = torch.einsum('bnd,bndm -> bnm', [z, alpha])
         return self.final_act(out) if self.final_act is not None else out

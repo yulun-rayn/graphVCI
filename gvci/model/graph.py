@@ -1,6 +1,7 @@
 from typing import Optional, Tuple, Union
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 from torch_geometric.data import Data, Batch
@@ -9,47 +10,23 @@ from torch_geometric.utils import softmax
 from gvci.utils.model_utils import masked_softmax
 
 
-class MyLinkPred(torch.nn.Module):
-    def __init__(self, sizes, mode="sparse", final_act=None):
-        super().__init__()
-        if mode == "dense":
-            self.network = MyDenseGCN(sizes,
-                add_self_loops=True, final_act=final_act
-            )
-        elif mode == "sparse":
-            self.network = MyGCN(sizes,
-                add_self_loops=True, final_act=final_act
-            )
-        else:
-            raise ValueError("mode not recognized")
-
-    def encode(self, x, edge_index):
-        return self.network(x, edge_index).squeeze(0)
-
-    def decode(self, z, edge_label_index):
-        return (z[edge_label_index[0]] * z[edge_label_index[1]]).sum(dim=-1)
-
-    def decode_all(self, z):
-        prob_adj = z @ z.t()
-        return (prob_adj > 0).nonzero(as_tuple=False).t()
-
-
-class MyGAT(torch.nn.Module):
-    def __init__(self, sizes,
-                heads=2, add_self_loops=False,
-                batch_norm=False, final_act=None):
+class MyGAT(nn.Module):
+    def __init__(self, sizes, heads=2, final_act=None,
+                add=False, layer_norm=False,
+                add_self_loops=False):
         super(MyGAT, self).__init__()
         layers = []
-        norms = [] if batch_norm else None
+        norms = [] if layer_norm else None
         for s in range(len(sizes) - 2):
             layers += [MyGATConv(sizes[s], sizes[s + 1],
                 heads=heads, add_self_loops=add_self_loops
             )]
-            if batch_norm:
-                norms += [torch.nn.BatchNorm1d(sizes[s + 1])]
-        self.layers = torch.nn.ModuleList(layers)
-        self.norms = torch.nn.ModuleList(norms) if norms is not None else None
-        self.act = torch.nn.ReLU()
+            if layer_norm:
+                norms += [nn.BatchNorm1d(sizes[s + 1])]
+        self.layers = nn.ModuleList(layers)
+        self.norms = nn.ModuleList(norms) if norms is not None else None
+        self.act = nn.ReLU()
+        self.add = add
 
         self.final_layer = MyGATConv(sizes[-2], sizes[-1],
             heads=heads, add_self_loops=add_self_loops
@@ -57,11 +34,11 @@ class MyGAT(torch.nn.Module):
         if final_act is None:
             self.final_act = None
         elif final_act == 'relu':
-            self.final_act = torch.nn.ReLU()
+            self.final_act = nn.ReLU()
         elif final_act == 'sigmoid':
-            self.final_act = torch.nn.Sigmoid()
+            self.final_act = nn.Sigmoid()
         elif final_act == 'softmax':
-            self.final_act = torch.nn.Softmax(dim=-1)
+            self.final_act = nn.Softmax(dim=-1)
         else:
             raise ValueError("final_act not recognized")
 
@@ -76,7 +53,8 @@ class MyGAT(torch.nn.Module):
         )
 
         for i, layer in enumerate(self.layers):
-            x = layer(x, edge_index, edge_weight)
+            out = layer(x, edge_index, edge_weight)
+            x = out + x if self.add else out
             x = (
                 self.norms[i](x)
                 if self.norms is not None else x
@@ -90,35 +68,36 @@ class MyGAT(torch.nn.Module):
         return torch.stack([d.x for d in data_list])
 
 
-class MyGCN(torch.nn.Module):
-    def __init__(self, sizes,
-                normalize=False, add_self_loops=False,
-                batch_norm=False, final_act=None):
+class MyGCN(nn.Module):
+    def __init__(self, sizes, final_act=None,
+                add=False, layer_norm=False,
+                add_self_loops=False):
         super(MyGCN, self).__init__()
         layers = []
-        norms = [] if batch_norm else None
+        norms = [] if layer_norm else None
         for s in range(len(sizes) - 2):
             layers += [MyGCNConv(
                 sizes[s], sizes[s + 1],
-                normalize=normalize, add_self_loops=add_self_loops
+                add_self_loops=add_self_loops, normalize=False
             )]
-            if batch_norm:
-                norms += [torch.nn.BatchNorm1d(sizes[s + 1])]
-        self.layers = torch.nn.ModuleList(layers)
-        self.norms = torch.nn.ModuleList(norms) if norms is not None else None
-        self.act = torch.nn.ReLU()
+            if layer_norm:
+                norms += [nn.LayerNorm(sizes[s + 1])]
+        self.layers = nn.ModuleList(layers)
+        self.norms = nn.ModuleList(norms) if norms is not None else None
+        self.act = nn.ReLU()
+        self.add = add
 
         self.final_layer = MyGCNConv(sizes[-2], sizes[-1],
-            normalize=normalize, add_self_loops=add_self_loops
+            add_self_loops=add_self_loops, normalize=False
         )
         if final_act is None:
             self.final_act = None
         elif final_act == 'relu':
-            self.final_act = torch.nn.ReLU()
+            self.final_act = nn.ReLU()
         elif final_act == 'sigmoid':
-            self.final_act = torch.nn.Sigmoid()
+            self.final_act = nn.Sigmoid()
         elif final_act == 'softmax':
-            self.final_act = torch.nn.Softmax(dim=-1)
+            self.final_act = nn.Softmax(dim=-1)
         else:
             raise ValueError("final_act not recognized")
 
@@ -135,7 +114,8 @@ class MyGCN(torch.nn.Module):
         )
 
         for i, layer in enumerate(self.layers):
-            x = layer(x, edge_index, edge_weight)
+            out = layer(x, edge_index, edge_weight)
+            x = out + x if self.add else out
             x = (
                 self.norms[i](x)
                 if self.norms is not None else x
@@ -149,34 +129,35 @@ class MyGCN(torch.nn.Module):
         return torch.stack([d.x for d in data_list])
 
 
-class MyDenseGCN(torch.nn.Module):
-    def __init__(self, sizes,
-                normalize=False, add_self_loops=False,
-                batch_norm=False, final_act=None):
+class MyDenseGCN(nn.Module):
+    def __init__(self, sizes, final_act=None,
+                add=False, layer_norm=False,
+                add_self_loops=False):
         super(MyDenseGCN, self).__init__()
         layers = []
-        norms = [] if batch_norm else None
+        norms = [] if layer_norm else None
         for s in range(len(sizes) - 2):
             layers += [MyDenseGCNConv(sizes[s], sizes[s + 1],
-                normalize=normalize, add_self_loops=add_self_loops
+                add_self_loops=add_self_loops, normalize=False
             )]
-            if batch_norm:
-                norms += [torch.nn.BatchNorm1d(sizes[s + 1])]
-        self.layers = torch.nn.ModuleList(layers)
-        self.norms = torch.nn.ModuleList(norms) if norms is not None else None
-        self.act = torch.nn.ReLU()
+            if layer_norm:
+                norms += [nn.LayerNorm(sizes[s + 1])]
+        self.layers = nn.ModuleList(layers)
+        self.norms = nn.ModuleList(norms) if norms is not None else None
+        self.act = nn.ReLU()
+        self.add = add
 
         self.final_layer = MyDenseGCNConv(sizes[-2], sizes[-1],
-            normalize=normalize, add_self_loops=add_self_loops
+            add_self_loops=add_self_loops, normalize=False
         )
         if final_act is None:
             self.final_act = None
         elif final_act == 'relu':
-            self.final_act = torch.nn.ReLU()
+            self.final_act = nn.ReLU()
         elif final_act == 'sigmoid':
-            self.final_act = torch.nn.Sigmoid()
+            self.final_act = nn.Sigmoid()
         elif final_act == 'softmax':
-            self.final_act = torch.nn.Softmax(dim=-1)
+            self.final_act = nn.Softmax(dim=-1)
         else:
             raise ValueError("final_act not recognized")
 
@@ -186,7 +167,8 @@ class MyDenseGCN(torch.nn.Module):
             adj = adj*weight
 
         for i, layer in enumerate(self.layers):
-            x = layer(x, adj)
+            out = layer(x, adj)
+            x = out + x if self.add else out
             x = (
                 self.norms[i](x.transpose(1, 2)).transpose(1, 2) 
                 if self.norms is not None else x
@@ -561,7 +543,7 @@ class MyGCNConv(MessagePassing):
         return x_j if edge_weight is None else edge_weight.view(-1, 1) * x_j
 
 
-class MyDenseGCNConv(torch.nn.Module):
+class MyDenseGCNConv(nn.Module):
     r"""See :class:`torch_geometric.nn.conv.GCNConv`.
     """
     def __init__(self, in_channels: int, out_channels: int,

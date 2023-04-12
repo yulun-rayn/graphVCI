@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 
 from .graph import MyDenseGCN, MyGCN, MyGAT
 from .aggr import (
@@ -9,7 +10,7 @@ from .aggr import (
 from vci.model.module import MLP
 
 
-class GVCIEncoder(torch.nn.Module):
+class GVCIEncoder(nn.Module):
     def __init__(self, mlp_sizes, gnn_sizes, num_nodes,
                  aggr_heads=1, graph_mode="sparse", aggr_mode="mlp",
                  final_act=None):
@@ -20,12 +21,12 @@ class GVCIEncoder(torch.nn.Module):
         self.encoder = MLP(mlp_sizes)
 
         if self.graph_mode == "dense":
-            self.graph_encoder = MyDenseGCN(gnn_sizes,
-                add_self_loops=True, final_act=final_act
+            self.graph_encoder = MyDenseGCN(gnn_sizes, final_act=final_act,
+                add=True, layer_norm=True, add_self_loops=True
             )
         elif self.graph_mode == "sparse":
-            self.graph_encoder = MyGCN(gnn_sizes,
-                add_self_loops=True, final_act=final_act
+            self.graph_encoder = MyGCN(gnn_sizes, final_act=final_act,
+                add=True, layer_norm=True, add_self_loops=True
             )
         else:
             raise ValueError("graph_mode not recognized")
@@ -63,7 +64,7 @@ class GVCIEncoder(torch.nn.Module):
             return z
 
 
-class GVCIDecoder(torch.nn.Module):
+class GVCIDecoder(nn.Module):
     def __init__(self, mlp_sizes, num_features,
                  aggr_heads=1, aggr_mode="dot",
                  final_act=None):

@@ -10,7 +10,8 @@ Visit our [resource site](https://osf.io/5n2mz/) and download the contents of `g
 ### 1. Create Initial GRN
 Open [GenerateGRN.ipynb](graphs/GenerateGRN.ipynb), set dataset name in the second chunk, then run all.
 
-  \* *if GRN refinement is not desired, the steps below are not necessary.*
+> *if GRN refinement is not desired, the steps below are not necessary.*
+-----
 
 ### 2. Run Updating Model
 ```bash

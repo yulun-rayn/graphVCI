@@ -2,8 +2,13 @@
 
 This repository is the official implementation of [**Predicting Cellular Responses with Variational Causal Inference and Refined Relational Information**](https://arxiv.org/abs/2210.00116).
 
+### Workflow
 ![](figure/workflow.png)
 
+### Architecture
+![](figure/architecture.png)
+
+### Dataset
 The L008 CROP-seq dataset released with our paper can be found [here](https://osf.io/a87cu/).
 
 

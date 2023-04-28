@@ -22,7 +22,7 @@ class MyGAT(nn.Module):
                 heads=heads, add_self_loops=add_self_loops
             )]
             if layer_norm:
-                norms += [nn.BatchNorm1d(sizes[s + 1])]
+                norms += [nn.LayerNorm(sizes[s + 1])]
         self.layers = nn.ModuleList(layers)
         self.norms = nn.ModuleList(norms) if norms is not None else None
         self.act = nn.ReLU()

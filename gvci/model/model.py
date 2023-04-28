@@ -149,10 +149,10 @@ class GVCI(VCI):
             edge_index, num_nodes=self.num_nodes
         )
         if self.graph_mode == "dense":
-            edge_index = to_dense_adj(edge_index)[0].t()
             edge_weight_logits = to_dense_adj(edge_index,
                 edge_attr=2.*torch.ones(edge_index.size(1)), fill_value=-2.
             )[0].t()
+            edge_index = to_dense_adj(edge_index)[0].t()
         elif self.graph_mode == "sparse":
             edge_weight_logits = torch.ones(edge_index.size(1))
         else:

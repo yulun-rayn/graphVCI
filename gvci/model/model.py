@@ -3,12 +3,12 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Normal, RelaxedBernoulli
+from torch.distributions import Normal
 
 import torch_geometric as pyg
 from torch_geometric.utils import add_remaining_self_loops
 
-from .module import GVCIEncoder, GVCIDecoder
+from .module import Enc_graphVCI, Dec_graphVCI
 
 from gvci.utils.graph_utils import to_dense_adj
 
@@ -21,7 +21,7 @@ from vci.model.module import (
 #                    MODEL SAVING                   #
 #####################################################
 
-def load_GVCI(args, state_dict=None):
+def load_graphVCI(args, state_dict=None):
     device = (
         "cuda:" + str(args["gpu"])
             if (not args["cpu"]) 
@@ -30,7 +30,7 @@ def load_GVCI(args, state_dict=None):
         "cpu"
     )
 
-    model = GVCI(
+    model = graphVCI(
         args["graph_path"],
         args["num_outcomes"],
         args["num_treatments"],
@@ -56,7 +56,7 @@ def load_GVCI(args, state_dict=None):
 #                     MAIN MODEL                    #
 #####################################################
 
-class GVCI(VCI):
+class graphVCI(VCI):
     def __init__(
         self,
         base_graph,
@@ -213,7 +213,7 @@ class GVCI(VCI):
             covariate_dim = sum(self.num_covariates)
 
         # encoder
-        self.encoder = GVCIEncoder(
+        self.encoder = Enc_graphVCI(
             mlp_sizes=[outcome_dim+treatment_dim+covariate_dim]
                 + [self.hparams["encoder_width"]] * (self.hparams["encoder_depth"] - 1)
                 + [self.hparams["latent_dim"]],
@@ -231,7 +231,7 @@ class GVCI(VCI):
         self.encoder_eval = copy.deepcopy(self.encoder)
 
         # decoder
-        self.decoder = GVCIDecoder(
+        self.decoder = Dec_graphVCI(
             mlp_sizes=[self.hparams["latent_dim"]+treatment_dim]
                 + [self.hparams["decoder_width"]] * (self.hparams["decoder_depth"] - 1),
             num_features=self.g_hparams["graph_latent_dim"],
@@ -297,7 +297,7 @@ class GVCI(VCI):
                 assert self.hparams["discriminator_width"] == self.g_hparams["graph_discriminator_width"]
 
             self.discriminator = nn.Sequential(
-                GVCIEncoder(
+                Enc_graphVCI(
                     mlp_sizes=[outcome_dim+treatment_dim+covariate_dim]
                         + [self.hparams["discriminator_width"]] 
                             * (self.hparams["discriminator_depth"] - 1),
@@ -361,7 +361,7 @@ class GVCI(VCI):
                 assert self.hparams["estimator_width"] == self.g_hparams["graph_estimator_width"]
 
             self.outcome_estimator = nn.Sequential(
-                GVCIEncoder(
+                Enc_graphVCI(
                     mlp_sizes=[treatment_dim+covariate_dim]
                         + [self.hparams["estimator_width"]] 
                             * (self.hparams["estimator_depth"] - 1),
@@ -545,7 +545,7 @@ class GVCI(VCI):
     def update(self, outcomes, treatments, cf_outcomes, cf_treatments, covariates,
                 rsample=True, detach_encode=False, detach_eval=True):
         """
-        Update GVCI's parameters given a minibatch of outcomes, treatments, and
+        Update graphVCI's parameters given a minibatch of outcomes, treatments, and
         cell types.
         """
         outcomes, treatments, cf_outcomes, cf_treatments, covariates = self.move_inputs(
@@ -607,7 +607,7 @@ class GVCI(VCI):
 
         if self.graph_mode=="dense" and self.edge_grad:
             loss += (
-                self.hparams["reg_edge_weight"] * 
+                self.g_hparams["reg_edge_weight"] * 
                 torch.mean(torch.sigmoid(self.edge_weight_logits))
             )
 

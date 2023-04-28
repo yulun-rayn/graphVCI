@@ -10,11 +10,11 @@ from .aggr import (
 from vci.model.module import MLP
 
 
-class GVCIEncoder(nn.Module):
+class Enc_graphVCI(nn.Module):
     def __init__(self, mlp_sizes, gnn_sizes, num_nodes,
                  aggr_heads=1, graph_mode="sparse", aggr_mode="mlp",
                  final_act=None):
-        super(GVCIEncoder, self).__init__()
+        super(Enc_graphVCI, self).__init__()
         self.graph_mode = graph_mode
         self.aggr_mode = aggr_mode
 
@@ -64,11 +64,11 @@ class GVCIEncoder(nn.Module):
             return z
 
 
-class GVCIDecoder(nn.Module):
+class Dec_graphVCI(nn.Module):
     def __init__(self, mlp_sizes, num_features,
                  aggr_heads=1, aggr_mode="dot",
                  final_act=None):
-        super(GVCIDecoder, self).__init__()
+        super(Dec_graphVCI, self).__init__()
         self.aggr_mode = aggr_mode
 
         self.decoder = MLP(mlp_sizes)

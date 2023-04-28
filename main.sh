@@ -15,7 +15,7 @@ PYARGS="$PYARGS --gpu 0" #PYARGS="$PYARGS --cpu"
 PYARGS="$PYARGS --omega1 50.0"
 PYARGS="$PYARGS --outcome_dist normal"
 PYARGS="$PYARGS --dist_mode match"
-#PYARGS="$PYARGS --decode_aggr dot"
+PYARGS="$PYARGS --decode_aggr dot"
 
 PYARGS="$PYARGS --max_epochs 1000"
 PYARGS="$PYARGS --batch_size 64"

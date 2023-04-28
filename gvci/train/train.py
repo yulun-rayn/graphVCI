@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from gvci.model import load_GVCI
+from gvci.model import load_graphVCI
 
 from vci.dataset import load_dataset_splits
 from vci.evaluate import evaluate, evaluate_classic
@@ -30,13 +30,13 @@ def prepare(args, state_dict=None):
     args["num_treatments"] = datasets["training"].num_perturbations
     args["num_covariates"] = datasets["training"].num_covariates
 
-    model = load_GVCI(args, state_dict)
+    model = load_graphVCI(args, state_dict)
 
     return model, datasets
 
 def train(args):
     """
-    Trains a GVCI model
+    Trains a graphVCI model
     """
     if args["seed"] is not None:
         torch.manual_seed(args["seed"])

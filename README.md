@@ -4,7 +4,7 @@ This repository is the official implementation of [**Predicting Cellular Respons
 
 ### Workflow
 <p align="center">
-  <img src="figure/workflow.png" width="700" />
+  <img src="figure/workflow.png" width="600" />
 </p>
 
 ### Architecture

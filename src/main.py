@@ -21,7 +21,7 @@ def parse_arguments():
     parser.add_argument("--dist_mode", type=str, default="match", help='classify;discriminate;fit;match')
 
     # dataset arguments
-    parser.add_argument("--data", type=str, required=True)
+    parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument("--graph_path", type=str, required=True)
     parser.add_argument("--perturbation_key", type=str, default="perturbation")
     parser.add_argument("--control_key", type=str, default="control")

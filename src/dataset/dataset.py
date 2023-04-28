@@ -293,7 +293,7 @@ class SubDataset:
         return len(self.genes)
 
 def load_dataset_splits(
-    data: str,
+    data_path: str,
     perturbation_key: str,
     control_key: str,
     dose_key: Union[str, None],
@@ -304,7 +304,7 @@ def load_dataset_splits(
 ):
 
     dataset = Dataset(
-        data, perturbation_key, control_key, dose_key, covariate_keys, split_key, sample_cf=sample_cf
+        data_path, perturbation_key, control_key, dose_key, covariate_keys, split_key, sample_cf=sample_cf
     )
 
     splits = {

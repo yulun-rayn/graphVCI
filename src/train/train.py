@@ -26,7 +26,7 @@ def prepare_dpi(args, state_dict=None):
     )
 
     datasets = load_dataset_splits(
-        args["data"],
+        args["data_path"],
         args["perturbation_key"],
         args["control_key"],
         args["dose_key"],

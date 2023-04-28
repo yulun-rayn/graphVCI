@@ -10,7 +10,7 @@ import torch_geometric as pyg
 from torch_geometric.utils import add_remaining_self_loops
 
 from .module import (
-    MLP, MyDenseGCN, MyGCN, MyGAT, DenseGCNDecoder, GCNDecoder,
+    MLP, MyDenseGCN, MyGCN, DenseGCNDecoder, GCNDecoder,
     NegativeBinomial, ZeroInflatedNegativeBinomial
 )
 
@@ -131,10 +131,10 @@ class DPI(torch.nn.Module):
             )
             if encoder_model == MyDenseGCN:
                 assert decoder_model in [MyDenseGCN, DenseGCNDecoder]
-                edge_index = to_dense_adj(edge_index)[0].t()
                 edge_weight_logits = to_dense_adj(edge_index,
                     edge_attr=2.*torch.ones(edge_index.size(1)), fill_value=-2.
                 )[0].t()
+                edge_index = to_dense_adj(edge_index)[0].t()
             elif encoder_model == MyGCN:
                 assert decoder_model in [MyGCN, GCNDecoder]
                 edge_weight_logits = torch.ones(edge_index.size(1))

@@ -148,7 +148,7 @@ class GVCI(VCI):
         edge_index, _ = add_remaining_self_loops(
             edge_index, num_nodes=self.num_nodes
         )
-        if self.graph_mode == "dense":
+        if self.graph_mode == "dense": # row target, col source
             edge_weight_logits = to_dense_adj(edge_index,
                 edge_attr=2.*torch.ones(edge_index.size(1)), fill_value=-2.
             )[0].t()

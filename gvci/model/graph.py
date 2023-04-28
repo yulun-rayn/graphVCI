@@ -55,10 +55,7 @@ class MyGAT(nn.Module):
         for i, layer in enumerate(self.layers):
             out = layer(x, edge_index, edge_weight)
             x = out + x if self.add else out
-            x = (
-                self.norms[i](x)
-                if self.norms is not None else x
-            )
+            x = self.norms[i](x) if self.norms is not None else x
             x = self.act(x)
         x = self.final_layer(x, edge_index, edge_weight)
         x = self.final_act(x) if self.final_act is not None else x
@@ -116,10 +113,7 @@ class MyGCN(nn.Module):
         for i, layer in enumerate(self.layers):
             out = layer(x, edge_index, edge_weight)
             x = out + x if self.add else out
-            x = (
-                self.norms[i](x)
-                if self.norms is not None else x
-            )
+            x = self.norms[i](x) if self.norms is not None else x
             x = self.act(x)
         x = self.final_layer(x, edge_index, edge_weight)
         x = self.final_act(x) if self.final_act is not None else x
@@ -169,10 +163,7 @@ class MyDenseGCN(nn.Module):
         for i, layer in enumerate(self.layers):
             out = layer(x, adj)
             x = out + x if self.add else out
-            x = (
-                self.norms[i](x.transpose(1, 2)).transpose(1, 2) 
-                if self.norms is not None else x
-            )
+            x = self.norms[i](x) if self.norms is not None else x
             x = self.act(x)
         x = self.final_layer(x, adj)
         x = self.final_act(x) if self.final_act is not None else x

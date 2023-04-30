@@ -31,10 +31,3 @@ def gcn_norm(edge_index, edge_weight=None, num_nodes=None, dtype=None):
     deg_inv_sqrt = deg.pow_(-0.5)
     deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0)
     return edge_index, deg_inv_sqrt[row] * edge_weight * deg_inv_sqrt[col]
-
-def masked_softmax(logits, mask, dim=1):
-    logits_max = torch.max(logits,dim=dim,keepdim=True)[0]
-    odds = torch.exp(logits-logits_max)
-
-    odds = odds * mask.to(odds.dtype)
-    return odds / torch.sum(odds, dim=dim, keepdim=True)

@@ -5,12 +5,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 
-import torch_geometric as pyg
-from torch_geometric.utils import add_remaining_self_loops
-
 from .module import Enc_graphVCI, Dec_graphVCI
 
-from gvci.utils.graph_utils import to_dense_adj
+from gvci.utils.graph_utils import get_graph
 
 from vci.model import VCI
 from vci.model.module import (
@@ -59,7 +56,7 @@ def load_graphVCI(args, state_dict=None):
 class graphVCI(VCI):
     def __init__(
         self,
-        base_graph,
+        graph_data,
         num_outcomes,
         num_treatments,
         num_covariates,
@@ -75,26 +72,44 @@ class graphVCI(VCI):
         graph_mode="sparse",
         encode_aggr="sum",
         decode_aggr="dot",
-        feature_grad=True,
-        edge_grad=True,
+        node_grad=True,
+        edge_grad=False,
         best_score=-1e3,
         patience=5,
         device="cuda",
         hparams=""
     ):
-        # graph parameters
-        if type(base_graph) == str:
-            base_graph = torch.load(base_graph)
-        self.num_nodes, self.num_features = base_graph.x.size()
+        # set hyperparameters
+        self._init_hparams()
 
         self.graph_mode = graph_mode
         self.encode_aggr = encode_aggr
         self.decode_aggr = decode_aggr
-        self.feature_grad = feature_grad
+        self.node_grad = node_grad
         self.edge_grad = edge_grad
 
-        # set hyperparameters
-        self._init_hparams()
+        # make graph
+        if self.graph_mode == "dense": # row target, col source
+            output_adj_mode = "target_to_source"
+        elif self.graph_mode == "sparse": # first row souce, second row target
+            output_adj_mode = "source_to_target"
+        else:
+            ValueError("graph_mode not recognized")
+
+        if graph_data is None:
+            node_features, adjacency, edge_features = get_graph(
+                n_nodes=num_outcomes, n_features=self.g_hparams["graph_latent_dim"],
+                graph_mode=graph_mode, output_adj_mode=output_adj_mode)
+        elif type(graph_data) == str:
+            node_features, adjacency, edge_features = get_graph(graph=torch.load(graph_data),
+                n_nodes=num_outcomes, n_features=self.g_hparams["graph_latent_dim"],
+                graph_mode=graph_mode, output_adj_mode=output_adj_mode)
+        else:
+            node_features, adjacency, edge_features = get_graph(graph_data,
+                n_nodes=num_outcomes, n_features=self.g_hparams["graph_latent_dim"],
+                graph_mode=graph_mode, output_adj_mode=output_adj_mode)
+        self.num_nodes, self.num_features = node_features.size()
+        self.edge_dim = 1 if edge_features.dim() == 1 else edge_features.size(-1)
 
         super().__init__(
             num_outcomes,
@@ -115,7 +130,7 @@ class graphVCI(VCI):
             hparams
         )
 
-        self._init_graph(base_graph)
+        self._init_graph(node_features, adjacency, edge_features)
 
         self.to_device(device)
 
@@ -128,49 +143,32 @@ class graphVCI(VCI):
             "graph_discriminator_depth": 1,
             "graph_esimator_width": 64,
             "graph_esimator_depth": 1,
-            "feature_emb_lr": 3e-4,
-            "edge_weight_lr": 3e-4,
-            "reg_edge_weight": 20.0,
+            "node_emb_lr": 3e-4,
+            "edge_emb_lr": 3e-4
         }
 
-    def _init_graph(self, graph):
-
-        self.features_embeddings = nn.Parameter(
-            graph.x, requires_grad=self.feature_grad
+    def _init_graph(self, node_features, adjacency, edge_features):
+        # node
+        self.node_features = nn.Parameter(
+            node_features, requires_grad=self.node_grad
         )
-        if self.feature_grad:
+        if self.node_grad:
             self.optimizer_autoencoder.add_param_group(
-                {'params': self.features_embeddings, 'lr': self.g_hparams["feature_emb_lr"]}
+                {'params': self.node_features, 'lr': self.g_hparams["node_emb_lr"]}
             )
-
-        assert graph.edge_index is not None
-        edge_index = graph.edge_index
-        edge_index, _ = add_remaining_self_loops(
-            edge_index, num_nodes=self.num_nodes
+        # edge
+        self.adjacency = nn.Parameter(
+            adjacency, requires_grad=False
         )
-        if self.graph_mode == "dense": # row target, col source
-            edge_weight_logits = to_dense_adj(edge_index,
-                edge_attr=2.*torch.ones(edge_index.size(1)), fill_value=-2.
-            )[0].t()
-            edge_index = to_dense_adj(edge_index)[0].t()
-        elif self.graph_mode == "sparse":
-            edge_weight_logits = torch.ones(edge_index.size(1))
-        else:
-            ValueError("graph_mode not recognized")
-
-        self.edge_index = nn.Parameter(
-            edge_index, requires_grad=False
+        self.edge_features = nn.Parameter(
+            edge_features, requires_grad=self.edge_grad
         )
-        self.edge_weight_logits = nn.Parameter(
-            edge_weight_logits, requires_grad=self.edge_grad
-        )
-
         if self.edge_grad:
             self.optimizer_autoencoder.add_param_group(
-                {'params': self.edge_weight_logits, 'lr': self.g_hparams["edge_weight_lr"]}
+                {'params': self.edge_features, 'lr': self.g_hparams["edge_emb_lr"]}
             )
 
-        return self.features_embeddings, self.edge_weight_logits
+        return self.node_features, self.adjacency, self.edge_features
 
     def _init_indiv_model(self):
 
@@ -221,6 +219,7 @@ class graphVCI(VCI):
                 + [self.g_hparams["graph_encoder_width"]] * (self.g_hparams["graph_encoder_depth"] - 1)
                 + [self.g_hparams["graph_latent_dim"]],
             num_nodes=self.num_nodes,
+            edge_dim=self.edge_dim,
             aggr_heads=2,
             graph_mode=self.graph_mode,
             aggr_mode=self.encode_aggr,
@@ -305,6 +304,7 @@ class graphVCI(VCI):
                         + [self.g_hparams["graph_discriminator_width"]] 
                             * (self.g_hparams["graph_discriminator_depth"] - 1),
                     num_nodes=self.num_nodes,
+                    edge_dim=self.edge_dim,
                     aggr_heads=1,
                     graph_mode=self.graph_mode,
                     aggr_mode=self.encode_aggr,
@@ -369,6 +369,7 @@ class graphVCI(VCI):
                         + [self.g_hparams["graph_estimator_width"]] 
                             * (self.g_hparams["graph_estimator_depth"] - 1),
                     num_nodes=self.num_nodes,
+                    edge_dim=self.edge_dim,
                     aggr_heads=1,
                     graph_mode=self.graph_mode,
                     aggr_mode=self.encode_aggr,
@@ -407,25 +408,21 @@ class graphVCI(VCI):
             ]
 
         inputs = torch.cat([outcomes, treatments] + covariates, -1)
-        features = self.features_embeddings
 
         if eval:
-            return self.encoder_eval(
-                inputs, features, self.edge_index, self.edge_weight_logits, return_graph=True
-            )
+            return self.encoder_eval(inputs,
+                self.node_features, self.adjacency, self.edge_features, return_graph=True)
         else:
-            return self.encoder(
-                inputs, features, self.edge_index, self.edge_weight_logits, return_graph=True
-            )
+            return self.encoder(inputs,
+                self.node_features, self.adjacency, self.edge_features, return_graph=True)
 
     def decode(self, latents, graph_latents, treatments):
         if self.embed_treatments:
             treatments = self.treatments_embeddings(treatments.argmax(1))
 
         inputs = torch.cat([latents, treatments], -1)
-        features = graph_latents
 
-        return self.decoder(inputs, features)
+        return self.decoder(inputs, graph_latents)
 
     def discriminate(self, outcomes, treatments, covariates):
         if self.embed_outcomes:
@@ -438,10 +435,9 @@ class graphVCI(VCI):
             ]
 
         inputs = torch.cat([outcomes, treatments] + covariates, -1)
-        features = self.features_embeddings
 
         return self.discriminator(
-            inputs, features, self.edge_index, self.edge_weight_logits
+            inputs, self.node_features, self.adjacency, self.edge_features
         ).squeeze()
 
     def distributionize(self, constructions, dist=None, eps=1e-3):
@@ -604,12 +600,6 @@ class graphVCI(VCI):
             + self.omega1 * covar_spec_nllh
             + self.omega2 * kl_divergence
         )
-
-        if self.graph_mode=="dense" and self.edge_grad:
-            loss += (
-                self.g_hparams["reg_edge_weight"] * 
-                torch.mean(torch.sigmoid(self.edge_weight_logits))
-            )
 
         self.optimizer_autoencoder.zero_grad()
         loss.backward()

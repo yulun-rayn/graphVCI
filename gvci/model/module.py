@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from .graph import MyDenseGCN, MyGCN, MyGAT
+from .graph import MyDenseGCN, MyGCN, MyDenseGAT, MyGAT
 from .aggr import (
     GraphAggrSUM, GraphAggrMLP, GraphAggrMLPv2,
     NodeAggrDOT, NodeAggrMLP, NodeAggrATT
@@ -11,7 +11,7 @@ from vci.model.module import MLP
 
 
 class Enc_graphVCI(nn.Module):
-    def __init__(self, mlp_sizes, gnn_sizes, num_nodes,
+    def __init__(self, mlp_sizes, gnn_sizes, num_nodes, edge_dim=None,
                  aggr_heads=1, graph_mode="sparse", aggr_mode="mlp",
                  final_act=None):
         super(Enc_graphVCI, self).__init__()
@@ -24,10 +24,20 @@ class Enc_graphVCI(nn.Module):
             self.graph_encoder = MyDenseGCN(gnn_sizes, final_act=final_act,
                 add=True, layer_norm=True, add_self_loops=True
             )
+            '''
+            self.graph_encoder = MyDenseGAT(gnn_sizes, edge_dim=edge_dim,
+                final_act=final_act, add=True, layer_norm=True
+            )
+            '''
         elif self.graph_mode == "sparse":
             self.graph_encoder = MyGCN(gnn_sizes, final_act=final_act,
                 add=True, layer_norm=True, add_self_loops=True
             )
+            '''
+            self.graph_encoder = MyGAT(gnn_sizes, edge_dim=edge_dim,
+                final_act=final_act, add=True, layer_norm=True
+            )
+            '''
         else:
             raise ValueError("graph_mode not recognized")
 
@@ -52,9 +62,9 @@ class Enc_graphVCI(nn.Module):
         else:
             raise ValueError("aggr_mode not recognized")
 
-    def forward(self, z, x, edge_index, edge_weight_logits, return_graph=False):
+    def forward(self, z, x, edge_index, edge_attr, return_graph=False):
         z = self.encoder(z)
-        g = self.graph_encoder(x, edge_index, edge_weight_logits)
+        g = self.graph_encoder(x, edge_index, edge_attr)
 
         g = g.squeeze(0) if g.dim() > x.dim() else g
         z = self.aggr(z, g.mean(0)).squeeze(-1)

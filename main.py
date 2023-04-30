@@ -11,9 +11,9 @@ def parse_arguments():
 
     # setting arguments
     parser.add_argument('--name', default='default_run')
-    parser.add_argument("--data_path", type=str, required=True)
-    parser.add_argument("--graph_path", type=str, required=True)
     parser.add_argument("--artifact_path", type=str, required=True)
+    parser.add_argument("--data_path", type=str, required=True)
+    parser.add_argument("--graph_path", type=str, default=None)
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--gpu', default='0')
 

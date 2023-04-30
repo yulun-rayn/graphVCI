@@ -18,7 +18,7 @@ class MyGAT(nn.Module):
         layers = []
         norms = [] if layer_norm else None
         for s in range(len(sizes) - 2):
-            layers += [MyGATConv(sizes[s], sizes[s + 1],
+            layers += [MyGATConv(sizes[s], sizes[s + 1]//heads,
                 heads=heads, edge_dim=edge_dim
             )]
             if layer_norm:
@@ -28,7 +28,7 @@ class MyGAT(nn.Module):
         self.act = nn.ReLU()
         self.add = add
 
-        self.final_layer = MyGATConv(sizes[-2], sizes[-1],
+        self.final_layer = MyGATConv(sizes[-2], sizes[-1]//heads,
             heads=heads, edge_dim=edge_dim
         )
         if final_act is None:
@@ -87,7 +87,7 @@ class MyDenseGAT(nn.Module):
         layers = []
         norms = [] if layer_norm else None
         for s in range(len(sizes) - 2):
-            layers += [MyDenseGATConv(sizes[s], sizes[s + 1],
+            layers += [MyDenseGATConv(sizes[s], sizes[s + 1]//heads,
                 heads=heads, edge_dim=edge_dim
             )]
             if layer_norm:
@@ -97,7 +97,7 @@ class MyDenseGAT(nn.Module):
         self.act = nn.ReLU()
         self.add = add
 
-        self.final_layer = MyDenseGATConv(sizes[-2], sizes[-1],
+        self.final_layer = MyDenseGATConv(sizes[-2], sizes[-1]//heads,
             heads=heads, edge_dim=edge_dim
         )
         if final_act is None:
@@ -266,10 +266,10 @@ class MyDenseGCN(nn.Module):
 
 
 from torch import Tensor
+from torch.nn import Parameter
 from torch_geometric.typing import Adj, OptTensor, PairTensor
 from torch_geometric.utils import add_remaining_self_loops
 from torch_geometric.nn.conv import MessagePassing
-from torch_geometric.nn.dense.linear import Linear
 
 from gvci.utils.model_utils import init_randoms, init_zeros, gcn_norm
 
@@ -284,10 +284,11 @@ class MyGATConv(MessagePassing):
         in_channels: Union[int, Tuple[int, int]],
         out_channels: int,
         heads: int = 1,
-        concat: bool = False,
+        concat: bool = True,
         dropout: float = 0.0,
         edge_dim: Optional[int] = None,
         bias: bool = True,
+        init_method: str = 'uniform',
         **kwargs,
     ):
         kwargs.setdefault('aggr', 'add')
@@ -305,22 +306,29 @@ class MyGATConv(MessagePassing):
         if isinstance(in_channels, int):
             in_channels = (in_channels, in_channels)
 
-        self.lin_key = Linear(in_channels[0], heads * out_channels, bias=False)
-        self.lin_query = Linear(in_channels[1], heads * out_channels, bias=False)
-        self.lin_value = Linear(in_channels[0], heads * out_channels, bias=bias)
+        self.lin_query = Parameter(torch.Tensor(in_channels[1], heads * out_channels))
+        self.lin_key = Parameter(torch.Tensor(in_channels[0], heads * out_channels))
+        self.lin_value = Parameter(torch.Tensor(in_channels[0], heads * out_channels))
         if edge_dim is not None:
-            self.lin_edge = Linear(edge_dim, heads * out_channels, bias=False)
+            self.lin_edge = Parameter(torch.Tensor(edge_dim, heads * out_channels))
         else:
             self.lin_edge = self.register_parameter('lin_edge', None)
 
-        self.reset_parameters()
+        if bias and concat:
+            self.bias = Parameter(torch.Tensor(heads * out_channels))
+        elif bias and not concat:
+            self.bias = Parameter(torch.Tensor(out_channels))
+        else:
+            self.register_parameter('bias', None)
 
-    def reset_parameters(self):
-        self.lin_key.reset_parameters()
-        self.lin_query.reset_parameters()
-        self.lin_value.reset_parameters()
-        if self.edge_dim:
-            self.lin_edge.reset_parameters()
+        self.reset_parameters(init_method)
+
+    def reset_parameters(self, init_method='uniform'):
+        init_randoms(self.lin_query, init_method)
+        init_randoms(self.lin_key, init_method)
+        init_randoms(self.lin_value, init_method)
+        init_randoms(self.lin_edge, init_method)
+        init_zeros(self.bias)
 
     def forward(self, x: Union[Tensor, PairTensor], edge_index: Adj,
                 edge_attr: OptTensor = None, return_attention_weights=None):
@@ -341,9 +349,9 @@ class MyGATConv(MessagePassing):
         if isinstance(x, Tensor):
             x: PairTensor = (x, x)
 
-        query = self.lin_query(x[1]).view(-1, H, C)
-        key = self.lin_key(x[0]).view(-1, H, C)
-        value = self.lin_value(x[0]).view(-1, H, C)
+        query = torch.matmul(x[1], self.lin_query).view(-1, H, C)
+        key = torch.matmul(x[0], self.lin_key).view(-1, H, C)
+        value = torch.matmul(x[0], self.lin_value).view(-1, H, C)
 
         # propagate_type: (query: Tensor, key:Tensor, value: Tensor, edge_attr: OptTensor) # noqa
         out = self.propagate(edge_index, query=query, key=key, value=value,
@@ -357,6 +365,9 @@ class MyGATConv(MessagePassing):
         else:
             out = out.mean(dim=1)
 
+        if self.bias is not None:
+            out = out + self.bias
+
         if isinstance(return_attention_weights, bool):
             return out, (edge_index, alpha)
         else:
@@ -368,8 +379,8 @@ class MyGATConv(MessagePassing):
 
         if self.lin_edge is not None:
             assert edge_attr is not None
-            edge_attr = self.lin_edge(edge_attr).view(-1, self.heads,
-                                                      self.out_channels)
+            edge_attr = torch.matmul(edge_attr, self.lin_edge).view(
+                -1, self.heads, self.out_channels)
             key_j = key_j + edge_attr
 
         alpha = (query_i * key_j).sum(dim=-1) / self.out_channels**0.5
@@ -378,8 +389,8 @@ class MyGATConv(MessagePassing):
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
 
         out = value_j
-        if edge_attr is not None:
-            out = out + edge_attr
+        #if edge_attr is not None:
+        #    out = out + edge_attr
 
         out = out * alpha.view(-1, self.heads, 1)
         return out
@@ -399,10 +410,11 @@ class MyDenseGATConv(MessagePassing):
         in_channels: Union[int, Tuple[int, int]],
         out_channels: int,
         heads: int = 1,
-        concat: bool = False,
+        concat: bool = True,
         dropout: float = 0.0,
         edge_dim: Optional[int] = None,
         bias: bool = True,
+        init_method: str = 'uniform',
         **kwargs,
     ):
         kwargs.setdefault('aggr', 'add')
@@ -418,22 +430,29 @@ class MyDenseGATConv(MessagePassing):
         if isinstance(in_channels, int):
             in_channels = (in_channels, in_channels)
 
-        self.lin_key = Linear(in_channels[0], heads * out_channels, bias=False)
-        self.lin_query = Linear(in_channels[1], heads * out_channels, bias=False)
-        self.lin_value = Linear(in_channels[0], heads * out_channels, bias=bias)
+        self.lin_query = Parameter(torch.Tensor(in_channels[1], heads * out_channels))
+        self.lin_key = Parameter(torch.Tensor(in_channels[0], heads * out_channels))
+        self.lin_value = Parameter(torch.Tensor(in_channels[0], heads * out_channels))
         if edge_dim is not None:
-            self.lin_edge = Linear(edge_dim, heads * out_channels, bias=False)
+            self.lin_edge = Parameter(torch.Tensor(edge_dim, heads * out_channels))
         else:
             self.lin_edge = self.register_parameter('lin_edge', None)
 
-        self.reset_parameters()
+        if bias and concat:
+            self.bias = Parameter(torch.Tensor(heads * out_channels))
+        elif bias and not concat:
+            self.bias = Parameter(torch.Tensor(out_channels))
+        else:
+            self.register_parameter('bias', None)
 
-    def reset_parameters(self):
-        self.lin_key.reset_parameters()
-        self.lin_query.reset_parameters()
-        self.lin_value.reset_parameters()
-        if self.edge_dim:
-            self.lin_edge.reset_parameters()
+        self.reset_parameters(init_method)
+
+    def reset_parameters(self, init_method='uniform'):
+        init_randoms(self.lin_query, init_method)
+        init_randoms(self.lin_key, init_method)
+        init_randoms(self.lin_value, init_method)
+        init_randoms(self.lin_edge, init_method)
+        init_zeros(self.bias)
 
     def forward(self, x: Union[Tensor, PairTensor], adj: Tensor,
                 return_attention_weights=None):
@@ -458,9 +477,9 @@ class MyDenseGATConv(MessagePassing):
         if isinstance(x, Tensor):
             x: PairTensor = (x, x)
 
-        query = self.lin_query(x[1]).view(B, N, H, C)
-        key = self.lin_key(x[0]).view(B, N, H, C)
-        value = self.lin_value(x[0]).view(B, N, H, C)
+        query = torch.matmul(x[1], self.lin_query).view(B, N, H, C)
+        key = torch.matmul(x[0], self.lin_key).view(B, N, H, C)
+        value = torch.matmul(x[0], self.lin_value).view(B, N, H, C)
 
         alpha = torch.einsum('bnhf,bmhf->bhnm', query, key) / self.out_channels**0.5
         alpha = masked_softmax(alpha, mask=adj, dim=-1)
@@ -469,9 +488,12 @@ class MyDenseGATConv(MessagePassing):
         out = torch.einsum('bhnm,bmhf->bnhf', alpha, value)
 
         if self.concat:
-            out = out.view(B, N, self.heads * self.out_channels)
+            out = out.reshape(B, N, self.heads * self.out_channels)
         else:
             out = out.mean(dim=2)
+
+        if self.bias is not None:
+            out = out + self.bias
 
         if isinstance(return_attention_weights, bool):
             return out, (adj, alpha)
@@ -491,7 +513,8 @@ class MyGCNConv(MessagePassing):
     def __init__(self, in_channels: int, out_channels: int,
                  improved: bool = False, cached: bool = False,
                  add_self_loops: bool = True, normalize: bool = True,
-                 bias: bool = True, **kwargs):
+                 bias: bool = True, init_method: str = 'uniform',
+                 **kwargs):
         kwargs.setdefault('aggr', 'add')
         super().__init__(**kwargs)
 
@@ -504,12 +527,18 @@ class MyGCNConv(MessagePassing):
 
         self._cached_edge_index = None
 
-        self.lin = Linear(in_channels, out_channels, bias=bias)
+        self.lin = Parameter(torch.Tensor(in_channels, out_channels))
 
-        self.reset_parameters()
+        if bias:
+            self.bias = Parameter(torch.Tensor(out_channels))
+        else:
+            self.register_parameter('bias', None)
 
-    def reset_parameters(self):
-        self.lin.reset_parameters()
+        self.reset_parameters(init_method)
+
+    def reset_parameters(self, init_method='uniform'):
+        init_randoms(self.lin, init_method)
+        init_zeros(self.bias)
         self._cached_edge_index = None
 
     def forward(self, x: Tensor, edge_index: Adj,
@@ -534,11 +563,13 @@ class MyGCNConv(MessagePassing):
             else:
                 edge_index, edge_weight = cache[0], cache[1]
 
-        x = self.lin(x)
+        x = torch.matmul(x, self.lin)
 
-        # propagate_type: (x: Tensor, edge_weight: OptTensor)
         out = self.propagate(edge_index, x=x, edge_weight=edge_weight,
                              size=None)
+
+        if self.bias is not None:
+            out += self.bias
 
         return out
 
@@ -555,7 +586,8 @@ class MyDenseGCNConv(nn.Module):
     """
     def __init__(self, in_channels: int, out_channels: int,
                  improved: bool = False, add_self_loops: bool = True, 
-                 normalize: bool = True, bias: bool = True):
+                 normalize: bool = True, bias: bool = True,
+                 init_method: str = 'uniform'):
         super().__init__()
 
         self.in_channels = in_channels
@@ -564,12 +596,18 @@ class MyDenseGCNConv(nn.Module):
         self.add_self_loops = add_self_loops
         self.normalize = normalize
 
-        self.lin = Linear(in_channels, out_channels, bias=bias)
+        self.lin = Parameter(torch.Tensor(in_channels, out_channels))
 
-        self.reset_parameters()
+        if bias:
+            self.bias = Parameter(torch.Tensor(out_channels))
+        else:
+            self.register_parameter('bias', None)
 
-    def reset_parameters(self):
-        self.lin.reset_parameters()
+        self.reset_parameters(init_method)
+
+    def reset_parameters(self, init_method='uniform'):
+        init_randoms(self.lin, init_method)
+        init_zeros(self.bias)
 
     def forward(self, x, adj):
         r"""
@@ -596,9 +634,12 @@ class MyDenseGCNConv(nn.Module):
             deg_inv_sqrt = adj.sum(dim=-1).clamp(min=1).pow(-0.5)
             adj = deg_inv_sqrt.unsqueeze(-1) * adj * deg_inv_sqrt.unsqueeze(-2)
 
-        x = self.lin(x)
+        x = torch.matmul(x, self.lin)
 
         out = torch.matmul(adj, x) # row target, col source
+
+        if self.bias is not None:
+            out = out + self.bias
 
         return out
 

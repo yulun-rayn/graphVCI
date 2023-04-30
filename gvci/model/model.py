@@ -138,14 +138,19 @@ class graphVCI(VCI):
         self.g_hparams = {
             "graph_latent_dim": 128,
             "graph_encoder_width": 128,
-            "graph_encoder_depth": 1,
+            "graph_encoder_depth": 2,
             "graph_discriminator_width": 64,
             "graph_discriminator_depth": 1,
             "graph_esimator_width": 64,
             "graph_esimator_depth": 1,
+            "attention_heads": 2,
             "node_emb_lr": 3e-4,
             "edge_emb_lr": 3e-4
         }
+        assert self.g_hparams["graph_latent_dim"] % self.g_hparams["attention_heads"] == 0
+        assert self.g_hparams["graph_encoder_width"] % self.g_hparams["attention_heads"] == 0
+        assert self.g_hparams["graph_discriminator_width"] % self.g_hparams["attention_heads"] == 0
+        assert self.g_hparams["graph_esimator_width"] % self.g_hparams["attention_heads"] == 0
 
     def _init_graph(self, node_features, adjacency, edge_features):
         # node
@@ -218,7 +223,7 @@ class graphVCI(VCI):
             gnn_sizes=[self.num_features]
                 + [self.g_hparams["graph_encoder_width"]] * (self.g_hparams["graph_encoder_depth"] - 1)
                 + [self.g_hparams["graph_latent_dim"]],
-            num_nodes=self.num_nodes,
+            attention_heads=self.g_hparams["attention_heads"],
             edge_dim=self.edge_dim,
             aggr_heads=2,
             graph_mode=self.graph_mode,
@@ -303,7 +308,7 @@ class graphVCI(VCI):
                     gnn_sizes=[self.num_features]
                         + [self.g_hparams["graph_discriminator_width"]] 
                             * (self.g_hparams["graph_discriminator_depth"] - 1),
-                    num_nodes=self.num_nodes,
+                    attention_heads=self.g_hparams["attention_heads"],
                     edge_dim=self.edge_dim,
                     aggr_heads=1,
                     graph_mode=self.graph_mode,
@@ -368,7 +373,7 @@ class graphVCI(VCI):
                     gnn_sizes=[self.num_features]
                         + [self.g_hparams["graph_estimator_width"]] 
                             * (self.g_hparams["graph_estimator_depth"] - 1),
-                    num_nodes=self.num_nodes,
+                    attention_heads=self.g_hparams["attention_heads"],
                     edge_dim=self.edge_dim,
                     aggr_heads=1,
                     graph_mode=self.graph_mode,

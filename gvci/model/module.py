@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from .graph import MyDenseGCN, MyGCN, MyDenseGAT, MyGAT
 from .aggr import (
-    GraphAggrSUM, GraphAggrMLP, GraphAggrMLPv2,
+    GraphAggrSUM, GraphAggrMLP,
     NodeAggrDOT, NodeAggrMLP, NodeAggrATT
 )
 
@@ -11,8 +11,8 @@ from vci.model.module import MLP
 
 
 class Enc_graphVCI(nn.Module):
-    def __init__(self, mlp_sizes, gnn_sizes, num_nodes, edge_dim=None,
-                 aggr_heads=1, graph_mode="sparse", aggr_mode="mlp",
+    def __init__(self, mlp_sizes, gnn_sizes, attention_heads=1, aggr_heads=1,
+                 edge_dim=None, graph_mode="sparse", aggr_mode="mlp",
                  final_act=None):
         super(Enc_graphVCI, self).__init__()
         self.graph_mode = graph_mode
@@ -21,23 +21,23 @@ class Enc_graphVCI(nn.Module):
         self.encoder = MLP(mlp_sizes)
 
         if self.graph_mode == "dense":
+            '''
             self.graph_encoder = MyDenseGCN(gnn_sizes, final_act=final_act,
                 add=True, layer_norm=True, add_self_loops=True
             )
             '''
-            self.graph_encoder = MyDenseGAT(gnn_sizes, edge_dim=edge_dim,
-                final_act=final_act, add=True, layer_norm=True
+            self.graph_encoder = MyDenseGAT(gnn_sizes, heads=attention_heads,
+                edge_dim=edge_dim, final_act=final_act, add=True, layer_norm=True
             )
-            '''
         elif self.graph_mode == "sparse":
+            '''
             self.graph_encoder = MyGCN(gnn_sizes, final_act=final_act,
                 add=True, layer_norm=True, add_self_loops=True
             )
             '''
-            self.graph_encoder = MyGAT(gnn_sizes, edge_dim=edge_dim,
-                final_act=final_act, add=True, layer_norm=True
+            self.graph_encoder = MyGAT(gnn_sizes, heads=attention_heads,
+                edge_dim=edge_dim, final_act=final_act, add=True, layer_norm=True
             )
-            '''
         else:
             raise ValueError("graph_mode not recognized")
 

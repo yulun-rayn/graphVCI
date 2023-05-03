@@ -100,7 +100,7 @@ def get_graph(graph=None, n_nodes=None, n_features=None, graph_mode="sparse",
 
     # node
     if graph is None or graph.x is None:
-        node_features = torch.Tensor(n_nodes, n_features)
+        node_features = torch.randn(n_nodes, n_features)
     else:
         node_features = graph.x
 

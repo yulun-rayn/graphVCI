@@ -73,7 +73,7 @@ class graphVCI(VCI):
         encode_aggr="sum",
         decode_aggr="dot",
         node_grad=True,
-        edge_grad=False,
+        edge_grad=True,
         best_score=-1e3,
         patience=5,
         device="cuda",
@@ -138,7 +138,7 @@ class graphVCI(VCI):
         self.g_hparams = {
             "graph_latent_dim": 128,
             "graph_encoder_width": 128,
-            "graph_encoder_depth": 2,
+            "graph_encoder_depth": 1,
             "graph_discriminator_width": 64,
             "graph_discriminator_depth": 1,
             "graph_esimator_width": 64,

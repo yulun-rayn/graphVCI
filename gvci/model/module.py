@@ -21,7 +21,6 @@ class Enc_graphVCI(nn.Module):
         self.encoder = MLP(mlp_sizes)
 
         if self.graph_mode == "dense":
-            '''
             self.graph_encoder = MyDenseGCN(gnn_sizes, final_act=final_act,
                 add=True, layer_norm=True, add_self_loops=True
             )
@@ -29,8 +28,8 @@ class Enc_graphVCI(nn.Module):
             self.graph_encoder = MyDenseGAT(gnn_sizes, heads=attention_heads,
                 edge_dim=edge_dim, final_act=final_act, add=True, layer_norm=True
             )
-        elif self.graph_mode == "sparse":
             '''
+        elif self.graph_mode == "sparse":
             self.graph_encoder = MyGCN(gnn_sizes, final_act=final_act,
                 add=True, layer_norm=True, add_self_loops=True
             )
@@ -38,6 +37,7 @@ class Enc_graphVCI(nn.Module):
             self.graph_encoder = MyGAT(gnn_sizes, heads=attention_heads,
                 edge_dim=edge_dim, final_act=final_act, add=True, layer_norm=True
             )
+            '''
         else:
             raise ValueError("graph_mode not recognized")
 
@@ -53,12 +53,6 @@ class Enc_graphVCI(nn.Module):
                 output_size=mlp_sizes[-1],
                 final_act=final_act
             )
-            '''
-            self.aggr = GraphAggrMLPv2(aggr_heads,
-                input_size=num_nodes+mlp_sizes[-1],
-                final_act=final_act
-            )
-            '''
         else:
             raise ValueError("aggr_mode not recognized")
 

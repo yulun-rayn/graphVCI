@@ -12,14 +12,14 @@ from gvci.utils.graph_utils import masked_select
 
 
 class MyGAT(nn.Module):
-    def __init__(self, sizes, heads=2, edge_dim=None,
+    def __init__(self, sizes, heads=2, dropout=0.0, edge_dim=None,
                 final_act=None, add=False, layer_norm=False):
         super(MyGAT, self).__init__()
         layers = []
         norms = [] if layer_norm else None
         for s in range(len(sizes) - 2):
             layers += [MyGATConv(sizes[s], sizes[s + 1]//heads,
-                heads=heads, edge_dim=edge_dim
+                heads=heads, dropout=dropout, edge_dim=edge_dim
             )]
             if layer_norm:
                 norms += [nn.LayerNorm(sizes[s + 1])]
@@ -81,14 +81,14 @@ class MyGAT(nn.Module):
 
 
 class MyDenseGAT(nn.Module):
-    def __init__(self, sizes, heads=2, edge_dim=None,
+    def __init__(self, sizes, heads=2, dropout=0.1, edge_dim=None,
                 final_act=None, add=False, layer_norm=False):
         super(MyDenseGAT, self).__init__()
         layers = []
         norms = [] if layer_norm else None
         for s in range(len(sizes) - 2):
             layers += [MyDenseGATConv(sizes[s], sizes[s + 1]//heads,
-                heads=heads, edge_dim=edge_dim
+                heads=heads, dropout=dropout, edge_dim=edge_dim
             )]
             if layer_norm:
                 norms += [nn.LayerNorm(sizes[s + 1])]
@@ -137,14 +137,13 @@ class MyDenseGAT(nn.Module):
 class MyGCN(nn.Module):
     def __init__(self, sizes, final_act=None,
                 add=False, layer_norm=False,
-                add_self_loops=False):
+                add_self_loops=False, dropout=0.0):
         super(MyGCN, self).__init__()
         layers = []
         norms = [] if layer_norm else None
         for s in range(len(sizes) - 2):
-            layers += [MyGCNConv(
-                sizes[s], sizes[s + 1],
-                add_self_loops=add_self_loops, normalize=False
+            layers += [MyGCNConv(sizes[s], sizes[s + 1],
+                add_self_loops=add_self_loops, normalize=False, dropout=dropout
             )]
             if layer_norm:
                 norms += [nn.LayerNorm(sizes[s + 1])]
@@ -154,7 +153,7 @@ class MyGCN(nn.Module):
         self.add = add
 
         self.final_layer = MyGCNConv(sizes[-2], sizes[-1],
-            add_self_loops=add_self_loops, normalize=False
+            add_self_loops=add_self_loops, normalize=False, dropout=dropout
         )
         if final_act is None:
             self.final_act = None
@@ -208,13 +207,13 @@ class MyGCN(nn.Module):
 class MyDenseGCN(nn.Module):
     def __init__(self, sizes, final_act=None,
                 add=False, layer_norm=False,
-                add_self_loops=False):
+                add_self_loops=False, dropout=0.1):
         super(MyDenseGCN, self).__init__()
         layers = []
         norms = [] if layer_norm else None
         for s in range(len(sizes) - 2):
             layers += [MyDenseGCNConv(sizes[s], sizes[s + 1],
-                add_self_loops=add_self_loops, normalize=False
+                add_self_loops=add_self_loops, normalize=False, dropout=dropout
             )]
             if layer_norm:
                 norms += [nn.LayerNorm(sizes[s + 1])]
@@ -224,7 +223,7 @@ class MyDenseGCN(nn.Module):
         self.add = add
 
         self.final_layer = MyDenseGCNConv(sizes[-2], sizes[-1],
-            add_self_loops=add_self_loops, normalize=False
+            add_self_loops=add_self_loops, normalize=False, dropout=dropout
         )
         if final_act is None:
             self.final_act = None
@@ -513,8 +512,8 @@ class MyGCNConv(MessagePassing):
     def __init__(self, in_channels: int, out_channels: int,
                  improved: bool = False, cached: bool = False,
                  add_self_loops: bool = True, normalize: bool = True,
-                 bias: bool = True, init_method: str = 'uniform',
-                 **kwargs):
+                 dropout: float = 0.0, bias: bool = True,
+                 init_method: str = 'uniform', **kwargs):
         kwargs.setdefault('aggr', 'add')
         super().__init__(**kwargs)
 
@@ -524,6 +523,7 @@ class MyGCNConv(MessagePassing):
         self.cached = cached
         self.add_self_loops = add_self_loops
         self.normalize = normalize
+        self.dropout = dropout
 
         self._cached_edge_index = None
 
@@ -574,6 +574,9 @@ class MyGCNConv(MessagePassing):
         return out
 
     def message(self, x_j: Tensor, edge_weight: OptTensor) -> Tensor:
+
+        x_j = F.dropout(x_j, p=self.dropout, training=self.training)
+
         return x_j if edge_weight is None else edge_weight.view(-1, 1) * x_j
 
     def __repr__(self) -> str:
@@ -585,9 +588,9 @@ class MyDenseGCNConv(nn.Module):
     r"""See :class:`torch_geometric.nn.conv.DenseGCNConv`.
     """
     def __init__(self, in_channels: int, out_channels: int,
-                 improved: bool = False, add_self_loops: bool = True, 
-                 normalize: bool = True, bias: bool = True,
-                 init_method: str = 'uniform'):
+                 improved: bool = False, add_self_loops: bool = True,
+                 normalize: bool = True, dropout: float = 0.0,
+                 bias: bool = True, init_method: str = 'uniform'):
         super().__init__()
 
         self.in_channels = in_channels
@@ -595,6 +598,7 @@ class MyDenseGCNConv(nn.Module):
         self.improved = improved
         self.add_self_loops = add_self_loops
         self.normalize = normalize
+        self.dropout = dropout
 
         self.lin = Parameter(torch.Tensor(in_channels, out_channels))
 
@@ -633,6 +637,8 @@ class MyDenseGCNConv(nn.Module):
         if self.normalize:
             deg_inv_sqrt = adj.sum(dim=-1).clamp(min=1).pow(-0.5)
             adj = deg_inv_sqrt.unsqueeze(-1) * adj * deg_inv_sqrt.unsqueeze(-2)
+
+        adj = F.dropout(adj, p=self.dropout, training=self.training)
 
         x = torch.matmul(x, self.lin)
 

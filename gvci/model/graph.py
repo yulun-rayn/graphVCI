@@ -12,14 +12,15 @@ from gvci.utils.graph_utils import masked_select
 
 
 class MyGAT(nn.Module):
-    def __init__(self, sizes, heads=2, dropout=0.0, edge_dim=None,
-                final_act=None, add=False, layer_norm=False):
+    def __init__(self, sizes, heads=2, edge_dim=None, final_act=None,
+                 add=False, layer_norm=False, add_self_loops=False, dropout=0.0):
         super(MyGAT, self).__init__()
         layers = []
         norms = [] if layer_norm else None
         for s in range(len(sizes) - 2):
             layers += [MyGATConv(sizes[s], sizes[s + 1]//heads,
-                heads=heads, dropout=dropout, edge_dim=edge_dim
+                heads=heads, edge_dim=edge_dim,
+                add_self_loops=add_self_loops, dropout=dropout
             )]
             if layer_norm:
                 norms += [nn.LayerNorm(sizes[s + 1])]
@@ -29,7 +30,8 @@ class MyGAT(nn.Module):
         self.add = add
 
         self.final_layer = MyGATConv(sizes[-2], sizes[-1]//heads,
-            heads=heads, edge_dim=edge_dim
+            heads=heads, edge_dim=edge_dim,
+            add_self_loops=add_self_loops, dropout=dropout
         )
         if final_act is None:
             self.final_act = None
@@ -81,14 +83,15 @@ class MyGAT(nn.Module):
 
 
 class MyDenseGAT(nn.Module):
-    def __init__(self, sizes, heads=2, dropout=0.1, edge_dim=None,
-                final_act=None, add=False, layer_norm=False):
+    def __init__(self, sizes, heads=2, edge_dim=None, final_act=None,
+                 add=False, layer_norm=False, add_self_loops=False, dropout=0.1):
         super(MyDenseGAT, self).__init__()
         layers = []
         norms = [] if layer_norm else None
         for s in range(len(sizes) - 2):
             layers += [MyDenseGATConv(sizes[s], sizes[s + 1]//heads,
-                heads=heads, dropout=dropout, edge_dim=edge_dim
+                heads=heads, edge_dim=edge_dim,
+                add_self_loops=add_self_loops, dropout=dropout
             )]
             if layer_norm:
                 norms += [nn.LayerNorm(sizes[s + 1])]
@@ -98,7 +101,8 @@ class MyDenseGAT(nn.Module):
         self.add = add
 
         self.final_layer = MyDenseGATConv(sizes[-2], sizes[-1]//heads,
-            heads=heads, edge_dim=edge_dim
+            heads=heads, edge_dim=edge_dim,
+            add_self_loops=add_self_loops, dropout=dropout
         )
         if final_act is None:
             self.final_act = None
@@ -284,6 +288,7 @@ class MyGATConv(MessagePassing):
         out_channels: int,
         heads: int = 1,
         concat: bool = True,
+        add_self_loops: bool = False,
         dropout: float = 0.0,
         edge_dim: Optional[int] = None,
         bias: bool = True,
@@ -297,6 +302,7 @@ class MyGATConv(MessagePassing):
         self.out_channels = out_channels
         self.heads = heads
         self.concat = concat
+        self.add_self_loops = add_self_loops
         self.dropout = dropout
         self.edge_dim = edge_dim
 
@@ -347,6 +353,13 @@ class MyGATConv(MessagePassing):
 
         if isinstance(x, Tensor):
             x: PairTensor = (x, x)
+
+        if self.add_self_loops:
+            edge_index, tmp_edge_attr = add_remaining_self_loops(
+                edge_index, edge_attr, "mean", x[1].size(self.node_dim)
+            )
+            assert tmp_edge_attr is not None
+            edge_attr = tmp_edge_attr
 
         query = torch.matmul(x[1], self.lin_query).view(-1, H, C)
         key = torch.matmul(x[0], self.lin_key).view(-1, H, C)
@@ -410,6 +423,7 @@ class MyDenseGATConv(MessagePassing):
         out_channels: int,
         heads: int = 1,
         concat: bool = True,
+        add_self_loops: bool = False,
         dropout: float = 0.0,
         edge_dim: Optional[int] = None,
         bias: bool = True,
@@ -423,6 +437,7 @@ class MyDenseGATConv(MessagePassing):
         self.out_channels = out_channels
         self.heads = heads
         self.concat = concat
+        self.add_self_loops = add_self_loops
         self.dropout = dropout
         self.edge_dim = edge_dim
 
@@ -475,6 +490,11 @@ class MyDenseGATConv(MessagePassing):
 
         if isinstance(x, Tensor):
             x: PairTensor = (x, x)
+
+        if self.add_self_loops:
+            adj = adj.clone()
+            idx = torch.arange(N, dtype=torch.long, device=adj.device)
+            adj[:, idx, idx] = 1 if not self.improved else 2
 
         query = torch.matmul(x[1], self.lin_query).view(B, N, H, C)
         key = torch.matmul(x[0], self.lin_key).view(B, N, H, C)

@@ -21,21 +21,23 @@ class Enc_graphVCI(nn.Module):
         self.encoder = MLP(mlp_sizes)
 
         if self.graph_mode == "dense":
-            self.graph_encoder = MyDenseGCN(gnn_sizes, final_act=final_act,
-                add=True, layer_norm=True, add_self_loops=True
+            self.graph_encoder = MyDenseGCN(gnn_sizes,
+                final_act=final_act, add=True, layer_norm=True
             )
             '''
-            self.graph_encoder = MyDenseGAT(gnn_sizes, heads=attention_heads,
-                edge_dim=edge_dim, final_act=final_act, add=True, layer_norm=True
+            self.graph_encoder = MyDenseGAT(gnn_sizes,
+                heads=attention_heads, edge_dim=edge_dim,
+                final_act=final_act, add=True, layer_norm=True
             )
             '''
         elif self.graph_mode == "sparse":
-            self.graph_encoder = MyGCN(gnn_sizes, final_act=final_act,
-                add=True, layer_norm=True, add_self_loops=True
+            self.graph_encoder = MyGCN(gnn_sizes,
+                final_act=final_act, add=True, layer_norm=True
             )
             '''
-            self.graph_encoder = MyGAT(gnn_sizes, heads=attention_heads,
-                edge_dim=edge_dim, final_act=final_act, add=True, layer_norm=True
+            self.graph_encoder = MyGAT(gnn_sizes,
+                heads=attention_heads, edge_dim=edge_dim,
+                final_act=final_act, add=True, layer_norm=True
             )
             '''
         else:

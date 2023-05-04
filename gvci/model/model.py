@@ -99,15 +99,18 @@ class graphVCI(VCI):
         if graph_data is None:
             node_features, adjacency, edge_features = get_graph(
                 n_nodes=num_outcomes, n_features=self.g_hparams["graph_latent_dim"],
-                graph_mode=graph_mode, output_adj_mode=output_adj_mode)
+                graph_mode=graph_mode, output_adj_mode=output_adj_mode,
+                add_self_loops=True)
         elif type(graph_data) == str:
             node_features, adjacency, edge_features = get_graph(graph=torch.load(graph_data),
                 n_nodes=num_outcomes, n_features=self.g_hparams["graph_latent_dim"],
-                graph_mode=graph_mode, output_adj_mode=output_adj_mode)
+                graph_mode=graph_mode, output_adj_mode=output_adj_mode,
+                add_self_loops=True)
         else:
             node_features, adjacency, edge_features = get_graph(graph_data,
                 n_nodes=num_outcomes, n_features=self.g_hparams["graph_latent_dim"],
-                graph_mode=graph_mode, output_adj_mode=output_adj_mode)
+                graph_mode=graph_mode, output_adj_mode=output_adj_mode,
+                add_self_loops=True)
         self.num_nodes, self.num_features = node_features.size()
         self.edge_dim = 1 if edge_features.dim() == 1 else edge_features.size(-1)
 

@@ -3,6 +3,7 @@ import networkx as nx
 
 import torch
 from torch_scatter import scatter
+from torch_geometric.utils import add_remaining_self_loops
 
 def parse_grn(grn_df, name_col) -> nx.Graph:
     '''Parse a GRN data frame to a graph.
@@ -87,7 +88,8 @@ def masked_select(edge_index, mask, edge_mode="source_to_target"):
     return edge_index[:, source_index]
 
 def get_graph(graph=None, n_nodes=None, n_features=None, graph_mode="sparse",
-              input_adj_mode="source_to_target", output_adj_mode="source_to_target"):
+              input_adj_mode="source_to_target", output_adj_mode="source_to_target",
+              add_self_loops=False):
     assert graph_mode == "dense" or graph_mode == "sparse"
     assert input_adj_mode == "source_to_target" or input_adj_mode == "target_to_source"
     assert output_adj_mode == "source_to_target" or output_adj_mode == "target_to_source"
@@ -108,7 +110,7 @@ def get_graph(graph=None, n_nodes=None, n_features=None, graph_mode="sparse",
     if graph is None or graph.edge_index is None:
         if graph_mode == "dense":
             adjacency = torch.ones((n_nodes, n_nodes), dtype=torch.long)
-            edge_features = torch.ones_like(adjacency)
+            edge_features = torch.ones_like(adjacency, dtype=torch.float)
         elif graph_mode == "sparse":
             adjacency = torch.stack((torch.arange(n_nodes), torch.arange(n_nodes)))
             edge_features = torch.ones(adjacency.size(1))
@@ -123,9 +125,20 @@ def get_graph(graph=None, n_nodes=None, n_features=None, graph_mode="sparse",
                 adjacency = to_dense_adj(adjacency)[0]
             if edge_features is None:
                 edge_features = adjacency
+
+            if add_self_loops:
+                if input_adj_mode == "target_to_source":
+                    edge_features = edge_features.transpose(0,1)
+                    adjacency = adjacency.t()
+                    input_adj_mode == "source_to_target"
+                idx = torch.arange(adjacency.size(0), dtype=torch.long, device=adjacency.device)
+                adjacency[idx, idx] = 1
+                edge_features[idx, idx] = edge_features.mean(0)
+
             if input_adj_mode != output_adj_mode:
                 edge_features = edge_features.transpose(0,1)
                 adjacency = adjacency.t()
+
         if graph_mode == "sparse":
             if adjacency.size(0) != 2:
                 adjacency = adjacency.nonzero().t()
@@ -133,6 +146,15 @@ def get_graph(graph=None, n_nodes=None, n_features=None, graph_mode="sparse",
                     if edge_features is not None else None)
             if edge_features is None:
                 edge_features = torch.ones(adjacency.size(1))
+
+            if add_self_loops:
+                if input_adj_mode == "target_to_source":
+                    adjacency = torch.flip(adjacency, dims=(0,))
+                    input_adj_mode == "source_to_target"
+                adjacency, edge_features = add_remaining_self_loops(
+                    adjacency, edge_features, "mean", node_features.size(0)
+                )
+
             if input_adj_mode != output_adj_mode:
                 adjacency = torch.flip(adjacency, dims=(0,))
 

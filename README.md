@@ -4,12 +4,12 @@ This repository is the official implementation of [**Predicting Cellular Respons
 
 ### Workflow
 <p align="center">
-  <img src="figure/workflow.png" width="600" />
+  <img src="figure/workflow.png" width="400" />
 </p>
 
 ### Architecture
 <p align="center">
-  <img src="figure/architecture.png" width="900" />
+  <img src="figure/architecture.png" width="600" />
 </p>
 
 ### Dataset

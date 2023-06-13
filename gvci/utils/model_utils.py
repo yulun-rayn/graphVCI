@@ -2,7 +2,7 @@ import math
 
 import torch
 
-from torch_scatter import scatter_add
+from torch_geometric.utils import scatter
 from torch_geometric.utils.num_nodes import maybe_num_nodes
 
 def init_randoms(tensor, method='uniform'):
@@ -27,7 +27,7 @@ def gcn_norm(edge_index, edge_weight=None, num_nodes=None, dtype=None):
                                     device=edge_index.device)
 
     row, col = edge_index[0], edge_index[1]
-    deg = scatter_add(edge_weight, col, dim=0, dim_size=num_nodes)
+    deg = scatter(edge_weight, col, dim=0, dim_size=num_nodes, reduce='sum')
     deg_inv_sqrt = deg.pow_(-0.5)
     deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0)
     return edge_index, deg_inv_sqrt[row] * edge_weight * deg_inv_sqrt[col]

@@ -448,32 +448,6 @@ class graphVCI(VCI):
             inputs, self.node_features, self.adjacency, self.edge_features
         ).squeeze()
 
-    def distributionize(self, constructions, dist=None, eps=1e-3):
-        if dist is None:
-            dist = self.outcome_dist
-
-        if dist == "nb":
-            mus = F.softplus(constructions[:, :, 0]).add(eps)
-            thetas = F.softplus(constructions[:, :, 1]).add(eps)
-            dist = NegativeBinomial(
-                mu=mus, theta=thetas
-            )
-        elif dist == "zinb":
-            mus = F.softplus(constructions[:, :, 0]).add(eps)
-            thetas = F.softplus(constructions[:, :, 1]).add(eps)
-            zi_logits = constructions[:, :, 2].add(eps)
-            dist = ZeroInflatedNegativeBinomial(
-                mu=mus, theta=thetas, zi_logits=zi_logits
-            )
-        elif dist == "normal":
-            locs = constructions[:, :, 0]
-            scales = F.softplus(constructions[:, :, 1]).add(eps)
-            dist = Normal(
-                loc=locs, scale=scales
-            )
-
-        return dist
-
     def sample(self, latent_mu, latent_sigma, graph_latent, treatments, size=1):
         latent_mu = latent_mu.repeat(size, 1)
         latent_sigma = latent_sigma.repeat(size, 1)
@@ -547,7 +521,7 @@ class graphVCI(VCI):
             return outcomes_dist_samp.mean
 
     def update(self, outcomes, treatments, cf_outcomes, cf_treatments, covariates,
-                rsample=True, detach_encode=False, detach_eval=True):
+                sample_latent=True, sample_outcome=False, detach_encode=False, detach_eval=True):
         """
         Update graphVCI's parameters given a minibatch of outcomes, treatments, and
         cell types.
@@ -568,27 +542,29 @@ class graphVCI(VCI):
         outcomes_dist_samp = self.distributionize(outcomes_constr_samp)
 
         # p(y' | z, t')
-        if rsample:
-            cf_outcomes_constr = self.decode(
+        if sample_latent:
+            cf_outcomes_constr_out = self.decode(
                 latents_dist.rsample(), graph_latent, cf_treatments
             )
-            cf_outcomes_out = self.distributionize(cf_outcomes_constr).rsample()
         else:
-            cf_outcomes_constr = self.decode(
+            cf_outcomes_constr_out = self.decode(
                 latents_dist.mean, graph_latent, cf_treatments
             )
-            cf_outcomes_out = self.distributionize(cf_outcomes_constr).mean
+        if sample_outcome:
+            cf_outcomes_out = self.distributionize(cf_outcomes_constr_out).rsample()
+        else:
+            cf_outcomes_out = self.distributionize(cf_outcomes_constr_out).mean
 
         # q(z | y', g, x, t')
         if detach_encode:
-            if rsample:
-                cf_outcomes_in = self.distributionize(
-                    self.decode(latents_dist.sample(), cf_treatments)
-                ).rsample()
+            if sample_latent:
+                cf_outcomes_constr_in = self.decode(latents_dist.sample(), cf_treatments)
             else:
-                cf_outcomes_in = self.distributionize(
-                    self.decode(latents_dist.mean.detach(), cf_treatments)
-                ).mean
+                cf_outcomes_constr_in = self.decode(latents_dist.mean.detach(), cf_treatments)
+            if sample_outcome:
+                cf_outcomes_in = self.distributionize(cf_outcomes_constr_in).rsample()
+            else:
+                cf_outcomes_in = self.distributionize(cf_outcomes_constr_in).mean
         else:
             cf_outcomes_in = cf_outcomes_out
 
@@ -598,10 +574,8 @@ class graphVCI(VCI):
         cf_latents_dist = self.distributionize(cf_latents_constr, dist="normal")
 
         indiv_spec_nllh, covar_spec_nllh, kl_divergence = self.loss(
-            outcomes, outcomes_dist_samp,
-            cf_outcomes, cf_outcomes_out,
-            latents_dist, cf_latents_dist,
-            treatments, covariates
+            outcomes, outcomes_dist_samp, cf_outcomes, cf_outcomes_out,
+            latents_dist, cf_latents_dist, treatments, cf_treatments, covariates
         )
 
         loss = (self.omega0 * indiv_spec_nllh
@@ -619,21 +593,3 @@ class graphVCI(VCI):
             "Covar-spec NLLH": covar_spec_nllh.item(),
             "KL Divergence": kl_divergence.item()
         }
-
-    def update_discriminator(self, inputs_tru, inputs_fls):
-        loss_tru = self.loss_discriminator(
-            self.discriminator(inputs_tru).squeeze(),
-            torch.ones(inputs_tru.size(0), device=inputs_tru.device)
-        )
-
-        loss_fls = self.loss_discriminator(
-            self.discriminator(inputs_fls).squeeze(),
-            torch.zeros(inputs_fls.size(0), device=inputs_fls.device)
-        )
-
-        loss = (loss_tru+loss_fls)/2.
-        self.optimizer_discriminator.zero_grad()
-        loss.backward()
-        self.optimizer_discriminator.step()
-
-        return loss.item()

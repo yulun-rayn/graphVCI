@@ -2,8 +2,7 @@ import pandas as pd
 import networkx as nx
 
 import torch
-from torch_scatter import scatter
-from torch_geometric.utils import add_remaining_self_loops
+from torch_geometric.utils import scatter, add_remaining_self_loops
 
 def parse_grn(grn_df, name_col) -> nx.Graph:
     '''Parse a GRN data frame to a graph.

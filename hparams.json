@@ -17,6 +17,6 @@
     "autoencoder_wd": 4e-07, 
     "discriminator_wd": 4e-07, 
     "estimator_wd": 4e-07, 
-    "adversary_steps": 3, 
+    "discriminator_steps": 3, 
     "step_size_lr": 45
 }

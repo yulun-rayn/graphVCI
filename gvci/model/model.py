@@ -80,7 +80,7 @@ class graphVCI(VCI):
         hparams=""
     ):
         # set hyperparameters
-        self._init_hparams()
+        self._set_g_hparams()
 
         self.graph_mode = graph_mode
         self.encode_aggr = encode_aggr
@@ -137,7 +137,7 @@ class graphVCI(VCI):
 
         self.to_device(device)
 
-    def _init_hparams(self):
+    def _set_g_hparams(self):
         self.g_hparams = {
             "graph_latent_dim": 128,
             "graph_encoder_width": 128,
@@ -178,241 +178,15 @@ class graphVCI(VCI):
 
         return self.node_features, self.adjacency, self.edge_features
 
-    def _init_indiv_model(self):
-
-        params = []
-
-        # embeddings
-        if self.embed_outcomes:
-            self.outcomes_embeddings = MLP(
-                [self.num_outcomes, self.hparams["outcome_emb_dim"]], final_act="relu"
-            )
-            outcome_dim = self.hparams["outcome_emb_dim"]
-            params.extend(list(self.outcomes_embeddings.parameters()))
-        else:
-            outcome_dim = self.num_outcomes
-
-        if self.embed_treatments:
-            self.treatments_embeddings = nn.Embedding(
-                self.num_treatments, self.hparams["treatment_emb_dim"]
-            )
-            treatment_dim = self.hparams["treatment_emb_dim"]
-            params.extend(list(self.treatments_embeddings.parameters()))
-        else:
-            treatment_dim = self.num_treatments
-
-        if self.embed_covariates:
-            self.covariates_embeddings = []
-            for num_covariate in self.num_covariates:
-                self.covariates_embeddings.append(
-                    nn.Embedding(num_covariate, 
-                        self.hparams["covariate_emb_dim"]
-                    )
-                )
-            self.covariates_embeddings = nn.Sequential(
-                *self.covariates_embeddings
-            )
-            covariate_dim = self.hparams["covariate_emb_dim"]*len(self.num_covariates)
-            for emb in self.covariates_embeddings:
-                params.extend(list(emb.parameters()))
-        else:
-            covariate_dim = sum(self.num_covariates)
-
-        # encoder
-        self.encoder = Enc_graphVCI(
-            mlp_sizes=[outcome_dim+treatment_dim+covariate_dim]
-                + [self.hparams["encoder_width"]] * (self.hparams["encoder_depth"] - 1)
-                + [self.hparams["latent_dim"]],
-            gnn_sizes=[self.num_features]
-                + [self.g_hparams["graph_encoder_width"]] * (self.g_hparams["graph_encoder_depth"] - 1)
-                + [self.g_hparams["graph_latent_dim"]],
-            attention_heads=self.g_hparams["attention_heads"],
-            edge_dim=self.edge_dim,
-            aggr_heads=2,
-            graph_mode=self.graph_mode,
-            aggr_mode=self.encode_aggr,
-            final_act="relu"
-        )
-        params.extend(list(self.encoder.parameters()))
-
-        self.encoder_eval = copy.deepcopy(self.encoder)
-
-        # decoder
-        self.decoder = Dec_graphVCI(
-            mlp_sizes=[self.hparams["latent_dim"]+treatment_dim]
-                + [self.hparams["decoder_width"]] * (self.hparams["decoder_depth"] - 1),
-            num_features=self.g_hparams["graph_latent_dim"],
-            aggr_heads=self.num_dist_params,
-            aggr_mode=self.decode_aggr
-        )
-        params.extend(list(self.decoder.parameters()))
-
-        self.optimizer_autoencoder = torch.optim.Adam(
-            params,
-            lr=self.hparams["autoencoder_lr"],
-            weight_decay=self.hparams["autoencoder_wd"],
-        )
-        self.scheduler_autoencoder = torch.optim.lr_scheduler.StepLR(
-            self.optimizer_autoencoder, step_size=self.hparams["step_size_lr"]
-        )
-
-        return self.encoder, self.decoder
-
-    def _init_covar_model(self):
-
-        if self.dist_mode == "discriminate":
-            params = []
-
-            # embeddings
-            if self.embed_outcomes:
-                self.adv_outcomes_emb = MLP(
-                    [self.num_outcomes, self.hparams["outcome_emb_dim"]], final_act="relu"
-                )
-                outcome_dim = self.hparams["outcome_emb_dim"]
-                params.extend(list(self.adv_outcomes_emb.parameters()))
-            else:
-                outcome_dim = self.num_outcomes
-
-            if self.embed_treatments:
-                self.adv_treatments_emb = nn.Embedding(
-                    self.num_treatments, self.hparams["treatment_emb_dim"]
-                )
-                treatment_dim = self.hparams["treatment_emb_dim"]
-                params.extend(list(self.adv_treatments_emb.parameters()))
-            else:
-                treatment_dim = self.num_treatments
-
-            if self.embed_covariates:
-                self.adv_covariates_emb = []
-                for num_covariate in self.num_covariates:
-                    self.adv_covariates_emb.append(
-                        nn.Embedding(num_covariate, 
-                            self.hparams["covariate_emb_dim"]
-                        )
-                    )
-                self.adv_covariates_emb = nn.Sequential(
-                    *self.adv_covariates_emb
-                )
-                covariate_dim = self.hparams["covariate_emb_dim"]*len(self.num_covariates)
-                for emb in self.adv_covariates_emb:
-                    params.extend(list(emb.parameters()))
-            else:
-                covariate_dim = sum(self.num_covariates)
-
-            # model
-            if self.encode_aggr == "sum":
-                assert self.hparams["discriminator_width"] == self.g_hparams["graph_discriminator_width"]
-
-            self.discriminator = nn.Sequential(
-                Enc_graphVCI(
-                    mlp_sizes=[outcome_dim+treatment_dim+covariate_dim]
-                        + [self.hparams["discriminator_width"]] 
-                            * (self.hparams["discriminator_depth"] - 1),
-                    gnn_sizes=[self.num_features]
-                        + [self.g_hparams["graph_discriminator_width"]] 
-                            * (self.g_hparams["graph_discriminator_depth"] - 1),
-                    attention_heads=self.g_hparams["attention_heads"],
-                    edge_dim=self.edge_dim,
-                    aggr_heads=1,
-                    graph_mode=self.graph_mode,
-                    aggr_mode=self.encode_aggr,
-                    final_act="relu"
-                ),
-                MLP(self.hparams["discriminator_width"], 1)
-            )
-            self.loss_discriminator = nn.BCEWithLogitsLoss()
-            params.extend(list(self.discriminator.parameters()))
-
-            self.optimizer_discriminator = torch.optim.Adam(
-                params,
-                lr=self.hparams["discriminator_lr"],
-                weight_decay=self.hparams["discriminator_wd"],
-            )
-            self.scheduler_discriminator = torch.optim.lr_scheduler.StepLR(
-                self.optimizer_discriminator, step_size=self.hparams["step_size_lr"]
-            )
-
-            return self.discriminator
-
-        elif self.dist_mode == "fit":
-            params = []
-
-            # embeddings
-            if self.embed_treatments:
-                self.adv_treatments_emb = nn.Embedding(
-                    self.num_treatments, self.hparams["treatment_emb_dim"]
-                )
-                treatment_dim = self.hparams["treatment_emb_dim"]
-                params.extend(list(self.adv_treatments_emb.parameters()))
-            else:
-                treatment_dim = self.num_treatments
-
-            if self.embed_covariates:
-                self.adv_covariates_emb = []
-                for num_covariate in self.num_covariates:
-                    self.adv_covariates_emb.append(
-                        nn.Embedding(num_covariate, 
-                            self.hparams["covariate_emb_dim"]
-                        )
-                    )
-                self.adv_covariates_emb = nn.Sequential(
-                    *self.adv_covariates_emb
-                )
-                covariate_dim = self.hparams["covariate_emb_dim"]*len(self.num_covariates)
-                for emb in self.adv_covariates_emb:
-                    params.extend(list(emb.parameters()))
-            else:
-                covariate_dim = sum(self.num_covariates)
-
-            # model
-            if self.encode_aggr == "sum":
-                assert self.hparams["estimator_width"] == self.g_hparams["graph_estimator_width"]
-
-            self.outcome_estimator = nn.Sequential(
-                Enc_graphVCI(
-                    mlp_sizes=[treatment_dim+covariate_dim]
-                        + [self.hparams["estimator_width"]] 
-                            * (self.hparams["estimator_depth"] - 1),
-                    gnn_sizes=[self.num_features]
-                        + [self.g_hparams["graph_estimator_width"]] 
-                            * (self.g_hparams["graph_estimator_depth"] - 1),
-                    attention_heads=self.g_hparams["attention_heads"],
-                    edge_dim=self.edge_dim,
-                    aggr_heads=1,
-                    graph_mode=self.graph_mode,
-                    aggr_mode=self.encode_aggr,
-                    final_act="relu"
-                ),
-                MLP(self.hparams["estimator_width"], self.num_outcomes)
-            )
-            self.loss_outcome_estimator = nn.MSELoss()
-            params.extend(list(self.outcome_estimator.parameters()))
-
-            self.optimizer_estimator = torch.optim.Adam(
-                params,
-                lr=self.hparams["estimator_lr"],
-                weight_decay=self.hparams["estimator_wd"],
-            )
-            self.scheduler_estimator = torch.optim.lr_scheduler.StepLR(
-                self.optimizer_estimator, step_size=self.hparams["step_size_lr"]
-            )
-
-            return self.outcome_estimator
-
-        elif self.dist_mode == "match":
-            return None
-
-        else:
-            raise ValueError("dist_mode not recognized")
-
     def encode(self, outcomes, treatments, covariates, eval=False):
         if self.embed_outcomes:
             outcomes = self.outcomes_embeddings(outcomes)
         if self.embed_treatments:
-            treatments = self.treatments_embeddings(treatments.argmax(1))
+            treatments = self.treatments_embeddings(
+                treatments if treatments.shape[-1] == 1 else treatments.argmax(1))
         if self.embed_covariates:
-            covariates = [emb(covar.argmax(1)) 
-                for covar, emb in zip(covariates, self.covariates_embeddings)
+            covariates = [emb(covars if covars.shape[-1] == 1 else covars.argmax(1)) 
+                for covars, emb in zip(covariates, self.covariates_embeddings)
             ]
 
         inputs = torch.cat([outcomes, treatments] + covariates, -1)
@@ -426,7 +200,8 @@ class graphVCI(VCI):
 
     def decode(self, latents, graph_latents, treatments):
         if self.embed_treatments:
-            treatments = self.treatments_embeddings(treatments.argmax(1))
+            treatments = self.treatments_embeddings(
+                treatments if treatments.shape[-1] == 1 else treatments.argmax(1))
 
         inputs = torch.cat([latents, treatments], -1)
 
@@ -434,12 +209,13 @@ class graphVCI(VCI):
 
     def discriminate(self, outcomes, treatments, covariates):
         if self.embed_outcomes:
-            outcomes = self.outcomes_embeddings(outcomes)
+            outcomes = self.adv_outcomes_emb(outcomes)
         if self.embed_treatments:
-            treatments = self.treatments_embeddings(treatments.argmax(1))
+            treatments = self.adv_treatments_emb(
+                treatments if treatments.shape[-1] == 1 else treatments.argmax(1))
         if self.embed_covariates:
-            covariates = [emb(covar.argmax(1)) 
-                for covar, emb in zip(covariates, self.covariates_embeddings)
+            covariates = [emb(covars if covars.shape[-1] == 1 else covars.argmax(1)) 
+                for covars, emb in zip(covariates, self.covariates_embeddings)
             ]
 
         inputs = torch.cat([outcomes, treatments] + covariates, -1)
@@ -593,3 +369,47 @@ class graphVCI(VCI):
             "Covar-spec NLLH": covar_spec_nllh.item(),
             "KL Divergence": kl_divergence.item()
         }
+
+    def init_encoder(self):
+        return Enc_graphVCI(
+            mlp_sizes=[self.outcome_dim+self.treatment_dim+self.covariate_dim]
+                + [self.hparams["encoder_width"]] * (self.hparams["encoder_depth"] - 1)
+                + [self.hparams["latent_dim"]],
+            gnn_sizes=[self.num_features]
+                + [self.g_hparams["graph_encoder_width"]] * (self.g_hparams["graph_encoder_depth"] - 1)
+                + [self.g_hparams["graph_latent_dim"]],
+            attention_heads=self.g_hparams["attention_heads"],
+            edge_dim=self.edge_dim,
+            aggr_heads=2,
+            graph_mode=self.graph_mode,
+            aggr_mode=self.encode_aggr,
+            final_act="relu"
+        )
+    
+    def init_decoder(self):
+        return Dec_graphVCI(
+            mlp_sizes=[self.hparams["latent_dim"]+self.treatment_dim]
+                + [self.hparams["decoder_width"]] * (self.hparams["decoder_depth"] - 1),
+            num_features=self.g_hparams["graph_latent_dim"],
+            aggr_heads=self.num_dist_params,
+            aggr_mode=self.decode_aggr
+        )
+
+    def init_discriminator(self):
+        return nn.Sequential(
+            Enc_graphVCI(
+                mlp_sizes=[self.outcome_dim+self.treatment_dim+self.covariate_dim]
+                    + [self.hparams["discriminator_width"]] 
+                        * (self.hparams["discriminator_depth"] - 1),
+                gnn_sizes=[self.num_features]
+                    + [self.g_hparams["graph_discriminator_width"]] 
+                        * (self.g_hparams["graph_discriminator_depth"] - 1),
+                attention_heads=self.g_hparams["attention_heads"],
+                edge_dim=self.edge_dim,
+                aggr_heads=1,
+                graph_mode=self.graph_mode,
+                aggr_mode=self.encode_aggr,
+                final_act="relu"
+            ),
+            MLP(self.hparams["discriminator_width"], 1)
+        )

@@ -215,7 +215,7 @@ class graphVCI(VCI):
                 treatments if treatments.shape[-1] == 1 else treatments.argmax(1))
         if self.embed_covariates:
             covariates = [emb(covars if covars.shape[-1] == 1 else covars.argmax(1)) 
-                for covars, emb in zip(covariates, self.covariates_embeddings)
+                for covars, emb in zip(covariates, self.adv_covariates_emb)
             ]
 
         inputs = torch.cat([outcomes, treatments] + covariates, -1)
@@ -287,7 +287,7 @@ class graphVCI(VCI):
             latents_dist = self.distributionize(latents_constr, dist="normal")
 
             outcomes_constr_samp = self.sample(
-                latents_dist.mean, latents_dist.stddev, graph_latent, treatments
+                latents_dist.mean, latents_dist.stddev, graph_latent, cf_treatments
             )
             outcomes_dist_samp = self.distributionize(outcomes_constr_samp)
 
@@ -296,15 +296,11 @@ class graphVCI(VCI):
         else:
             return outcomes_dist_samp.mean
 
-    def update(self, outcomes, treatments, cf_outcomes, cf_treatments, covariates,
+    def forward(self, outcomes, treatments, cf_treatments, covariates,
                 sample_latent=True, sample_outcome=False, detach_encode=False, detach_eval=True):
         """
-        Update graphVCI's parameters given a minibatch of outcomes, treatments, and
-        cell types.
+        Execute the workflow.
         """
-        outcomes, treatments, cf_outcomes, cf_treatments, covariates = self.move_inputs(
-            outcomes, treatments, cf_outcomes, cf_treatments, covariates
-        )
 
         # q(z | y, g, x, t)
         latents_constr, graph_latent = self.encode(outcomes, treatments, covariates)
@@ -349,26 +345,7 @@ class graphVCI(VCI):
         )
         cf_latents_dist = self.distributionize(cf_latents_constr, dist="normal")
 
-        indiv_spec_nllh, covar_spec_nllh, kl_divergence = self.loss(
-            outcomes, outcomes_dist_samp, cf_outcomes, cf_outcomes_out,
-            latents_dist, cf_latents_dist, treatments, cf_treatments, covariates
-        )
-
-        loss = (self.omega0 * indiv_spec_nllh
-            + self.omega1 * covar_spec_nllh
-            + self.omega2 * kl_divergence
-        )
-
-        self.optimizer_autoencoder.zero_grad()
-        loss.backward()
-        self.optimizer_autoencoder.step()
-        self.iteration += 1
-
-        return {
-            "Indiv-spec NLLH": indiv_spec_nllh.item(),
-            "Covar-spec NLLH": covar_spec_nllh.item(),
-            "KL Divergence": kl_divergence.item()
-        }
+        return (outcomes_dist_samp, cf_outcomes_out,latents_dist, cf_latents_dist)
 
     def init_encoder(self):
         return Enc_graphVCI(

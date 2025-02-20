@@ -15,6 +15,17 @@ This repository is the official implementation of [**Predicting Cellular Respons
 ### Dataset
 The L008 CROP-seq dataset released with our paper can be found [here](https://osf.io/a87cu/).
 
+### Citation
+
+```BiBTeX
+@article{wu2022predicting,
+  title={Predicting cellular responses with variational causal inference and refined relational information},
+  author={Wu, Yulun and Barton, Robert A and Wang, Zichen and Ioannidis, Vassilis N and De Donno, Carlo and Price, Layne C and Voloch, Luis F and Karypis, George},
+  journal={International Conference on Learning Representations},
+  year={2023}
+}
+```
+
 
 ## Installation
 

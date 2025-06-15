@@ -1,27 +1,16 @@
 # Graph Variational Causal Inference
 
-This repository is the official implementation of [**Predicting Cellular Responses with Variational Causal Inference and Refined Relational Information**](https://arxiv.org/abs/2210.00116).
+This repository is the official implementation of [**Predicting Cellular Responses with Variational Causal Inference and Refined Relational Information**](https://arxiv.org/abs/2210.00116). The L008 CROP-seq dataset released with our paper can be found [here](https://osf.io/a87cu/).
 
-### Workflow
 <p align="center">
   <img src="figure/workflow.png" width="400" />
 </p>
 
-### Architecture
-<p align="center">
-  <img src="figure/architecture.png" width="600" />
-</p>
-
-### Dataset
-The L008 CROP-seq dataset released with our paper can be found [here](https://osf.io/a87cu/).
-
-### Citation
-
 ```BiBTeX
-@article{wu2022predicting,
-  title={Predicting cellular responses with variational causal inference and refined relational information},
-  author={Wu, Yulun and Barton, Robert A and Wang, Zichen and Ioannidis, Vassilis N and De Donno, Carlo and Price, Layne C and Voloch, Luis F and Karypis, George},
-  journal={International Conference on Learning Representations},
+@inproceedings{wupredicting,
+  title={Predicting Cellular Responses with Variational Causal Inference and Refined Relational Information},
+  author={Wu, Yulun and Barton, Rob and Wang, Zichen and Ioannidis, Vassilis N and De Donno, Carlo and Price, Layne C and Voloch, Luis F and Karypis, George},
+  booktitle={The Eleventh International Conference on Learning Representations},
   year={2023}
 }
 ```
@@ -49,10 +38,16 @@ pip install -e variational-causal-inference
 ```
 
 
+## Preparation
+
+Visit our [resource site](https://osf.io/5n2mz/), download the contents of `main/datasets` into [datasets](datasets) and the contents of `main/graphs` into [graphs](graphs). To process your own dataset, see `data-prep` branch; to generate your own graph, see `graph-prep` branch. If using gene relational graphs is not desired, see the [repository](https://github.com/yulun-rayn/variational-causal-inference) for [**Variational Causal Inference**](https://arxiv.org/abs/2209.05935). On top of variational causal inference, graphVCI uses the following model architecture to leverage gene relational information.
+
+<p align="center">
+  <img src="figure/architecture.png" width="600" />
+</p>
+
+
 ## Run
-
-Visit our [resource site](https://osf.io/5n2mz/), download the contents of `main/datasets` into [datasets](datasets) and the contents of `main/graphs` into [graphs](graphs). To process your own dataset, see `data-prep` branch; to generate your own graph, see `graph-prep` branch. If using gene relational graphs is not desired, see the [repository](https://github.com/yulun-rayn/variational-causal-inference) for [**Variational Causal Inference**](https://arxiv.org/abs/2209.05935).
-
 
 Once the environment is set up and the contents are prepared, the function call to train & evaluate graphVCI is:
 
@@ -62,7 +57,7 @@ Once the environment is set up and the contents are prepared, the function call 
 
 A list of flags may be found in `main.sh` and `main.py` for experimentation with different hyperparameters. The run log and models are saved under `*artifact_path*/saves`, and the tensorboard log is saved under `*artifact_path*/runs`.
 
+
 ## License
 
 Contributions are welcome! All content here is licensed under the MIT license.
-
